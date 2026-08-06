@@ -1,17 +1,14 @@
+import { gunzipSync } from 'node:zlib';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-const targets = {
-  'src/office.ts': 'source-parts/office-ts',
-  'src/simulation.ts': 'source-parts/simulation-ts',
-  'src/ui.ts': 'source-parts/ui-ts',
-  'src/styles.css': 'source-parts/styles-css',
-};
+const names = (await readdir('source-bundle')).filter((name) => name.endsWith('.b64')).sort();
+if (!names.length) throw new Error('No source bundle parts found');
+const encoded = (await Promise.all(names.map((name) => readFile(join('source-bundle', name), 'utf8')))).join('');
+const sources = JSON.parse(gunzipSync(Buffer.from(encoded, 'base64')).toString('utf8'));
 
-for (const [target, sourceDir] of Object.entries(targets)) {
-  const names = (await readdir(sourceDir)).filter((name) => name.endsWith('.part')).sort();
-  if (!names.length) throw new Error(`No source parts found for ${target}`);
-  const content = (await Promise.all(names.map((name) => readFile(join(sourceDir, name), 'utf8')))).join('');
+for (const [target, content] of Object.entries(sources)) {
+  if (typeof content !== 'string') throw new Error(`Invalid source content for ${target}`);
   await mkdir(dirname(target), { recursive: true });
   await writeFile(target, content);
 }
