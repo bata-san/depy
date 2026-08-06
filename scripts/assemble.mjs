@@ -4,7 +4,29 @@ import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 const bundleDir = 'source-bundle-v2';
-const expectedNames = Array.from({ length: 6 }, (_, index) => `${String(index).padStart(3, '0')}.b64`);
+const expectedNames = [
+  '000.b64',
+  '001.b64',
+  '002.b64',
+  '003a.b64',
+  '003b.b64',
+  '003c.b64',
+  '003d.b64',
+  '003e.b64',
+  '003f.b64',
+  '004a.b64',
+  '004b.b64',
+  '004c.b64',
+  '004d.b64',
+  '004e.b64',
+  '004f.b64',
+  '005a.b64',
+  '005b.b64',
+  '005c.b64',
+  '005d.b64',
+  '005e.b64',
+  '005f.b64',
+];
 const expectedEncodedSha = '9d414229a9a10f36b78446bd12921f5347e1ef8e035feba3ee0c23f88a2e1faf';
 const expectedSources = [
   'src/camera-controller.ts',
@@ -24,12 +46,20 @@ const expectedSources = [
   'src/ui.ts',
 ];
 
-const names = (await readdir(bundleDir)).filter((name) => name.endsWith('.b64')).sort();
-if (JSON.stringify(names) !== JSON.stringify(expectedNames)) {
-  throw new Error(`Incomplete source bundle: expected ${expectedNames.join(', ')}, found ${names.join(', ')}`);
+const available = new Set(await readdir(bundleDir));
+const missing = expectedNames.filter((name) => !available.has(name));
+if (missing.length) {
+  throw new Error(`Incomplete source bundle: missing ${missing.join(', ')}`);
 }
 
-const encoded = (await Promise.all(names.map(async (name) => (await readFile(join(bundleDir, name), 'utf8')).trim()))).join('');
+const encodedParts = await Promise.all(
+  expectedNames.map(async (name) => {
+    const content = (await readFile(join(bundleDir, name), 'utf8')).trim();
+    if (!content) throw new Error(`Empty source bundle segment: ${name}`);
+    return content;
+  }),
+);
+const encoded = encodedParts.join('');
 const encodedSha = createHash('sha256').update(encoded).digest('hex');
 if (encodedSha !== expectedEncodedSha) {
   throw new Error(`Source bundle checksum mismatch: expected ${expectedEncodedSha}, found ${encodedSha}`);
@@ -49,4 +79,6 @@ for (const [target, content] of Object.entries(sources)) {
   await writeFile(target, content);
 }
 
-console.log(`Restored ${sourceNames.length} TypeScript/CSS source files from verified bundle ${encodedSha.slice(0, 12)}.`);
+console.log(
+  `Restored ${sourceNames.length} TypeScript/CSS source files from ${expectedNames.length} verified segments (${encodedSha.slice(0, 12)}).`,
+);
