@@ -1,0 +1,224 @@
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import type { PanelId } from './types';
+
+export interface OfficeSnapshot {
+  activePanel: PanelId;
+  projectProgress: number;
+  productGlow: number;
+  staffCount: number;
+  officeLevel: number;
+  researchActive: boolean;
+  cashHealth: number;
+}
+
+export interface OfficeScene {
+  update: (delta: number, snapshot: OfficeSnapshot) => void;
+  resize: () => void;
+  dispose: () => void;
+}
+
+interface Hotspot {
+  id: PanelId;
+  object: THREE.Object3D;
+  marker: HTMLButtonElement;
+}
+
+const lerp = (a: number, b: number, amount: number): number => a + (b - a) * amount;
+const material = (color: number, roughness = .7, metalness = .08): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({ color, roughness, metalness });
+const emissiveMaterial = (color: number, emissive: number, intensity = 1): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({ color, roughness: .42, metalness: .18, emissive, emissiveIntensity: intensity });
+
+function box(width: number, height: number, depth: number, mat: THREE.Material, x = 0, y = 0, z = 0): THREE.Mesh {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), mat);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+function cylinder(radius: number, height: number, mat: THREE.Material, x = 0, y = 0, z = 0, segments = 20): THREE.Mesh {
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, segments), mat);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+function sphere(radius: number, mat: THREE.Material, x = 0, y = 0, z = 0): THREE.Mesh {
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 20, 14), mat);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  return mesh;
+}
+
+function addFloorTiles(group: THREE.Group): void {
+  const tileA = material(0x263341, .92);
+  const tileB = material(0x2d3b49, .9);
+  for (let x = -8; x < 8; x += 1) {
+    for (let z = -6; z < 6; z += 1) {
+      group.add(box(.96, .06, .96, (x + z) % 2 === 0 ? tileA : tileB, x + .5, -.02, z + .5));
+    }
+  }
+}
+
+function monitor(width = 1.05, color = 0x2d9dff): THREE.Group {
+  const group = new THREE.Group();
+  const frame = material(0x17212c, .4, .48);
+  const screenMaterial = emissiveMaterial(0x10243a, color, 1.45);
+  group.add(box(width, .62, .08, frame, 0, .42, 0));
+  const screen = box(width - .11, .51, .025, screenMaterial, 0, .42, -.054);
+  screen.name = 'screen';
+  group.add(screen, box(.1, .35, .1, frame, 0, .09, .02), box(.55, .05, .25, frame, 0, -.08, .02));
+  return group;
+}
+
+function chair(color = 0x263342): THREE.Group {
+  const group = new THREE.Group();
+  const upholstery = material(color, .7);
+  const metal = material(0x17212a, .38, .58);
+  group.add(box(.58, .14, .55, upholstery, 0, .58), box(.58, .7, .14, upholstery, 0, 1, .23));
+  group.add(cylinder(.07, .58, metal, 0, .27), box(.8, .07, .07, metal, 0, .04), box(.07, .07, .8, metal, 0, .04));
+  return group;
+}
+
+function desk(x: number, z: number, rotation = 0, screenColor = 0x2d9dff): THREE.Group {
+  const group = new THREE.Group();
+  const wood = material(0x8f684a, .66, .05);
+  const dark = material(0x26323d, .48, .38);
+  group.add(box(2.45, .15, 1.18, wood, 0, 1.08));
+  group.add(box(2.18, .13, .18, dark, 0, .92, .42));
+  for (const [legX, legZ] of [[-1.02, -.43], [1.02, -.43], [-1.02, .43], [1.02, .43]]) group.add(box(.13, 1.02, .13, dark, legX, .54, legZ));
+  const primary = monitor(1.06, screenColor);
+  primary.position.set(-.42, 1.22, -.22);
+  primary.rotation.y = .07;
+  const secondary = monitor(.78, screenColor);
+  secondary.position.set(.58, 1.23, -.2);
+  secondary.rotation.y = -.13;
+  group.add(primary, secondary, box(.72, .045, .24, dark, 0, 1.17, .3), box(.28, .05, .42, dark, .72, 1.17, .26));
+  const seat = chair();
+  seat.position.set(0, 0, .98);
+  seat.rotation.y = Math.PI;
+  group.add(seat);
+  group.position.set(x, 0, z);
+  group.rotation.y = rotation;
+  return group;
+}
+
+function staffPerson(color: number, x: number, z: number, rotation = 0): THREE.Group {
+  const group = new THREE.Group();
+  const skin = material(0xecc09d, .8);
+  const shirt = material(color, .72);
+  const pants = material(0x23303d, .78);
+  const hair = material(0x302720, .82);
+  group.add(cylinder(.27, .56, shirt, 0, 1.14));
+  group.add(sphere(.235, skin, 0, 1.58));
+  group.add(box(.33, .14, .34, hair, 0, 1.79, .03));
+  const leftArm = box(.15, .58, .16, shirt, -.32, 1.11, -.08);
+  const rightArm = box(.15, .58, .16, shirt, .32, 1.11, -.08);
+  leftArm.rotation.x = -.35;
+  rightArm.rotation.x = -.35;
+  group.add(leftArm, rightArm, box(.19, .58, .22, pants, -.14, .62), box(.19, .58, .22, pants, .14, .62));
+  group.position.set(x, 0, z);
+  group.rotation.y = rotation;
+  group.userData.phase = Math.random() * Math.PI * 2;
+  group.userData.baseX = x;
+  group.userData.baseZ = z;
+  return group;
+}
+
+function plant(x: number, z: number, scale = 1): THREE.Group {
+  const group = new THREE.Group();
+  group.add(cylinder(.31 * scale, .55 * scale, material(0x73503d, .82), 0, .28 * scale));
+  const leafMaterial = material(0x3e8f61, .74);
+  for (let index = 0; index < 7; index += 1) {
+    const leaf = box(.16 * scale, .7 * scale, .34 * scale, leafMaterial, 0, .82 * scale);
+    leaf.rotation.z = (index - 3) * .18;
+    leaf.rotation.y = index * .9;
+    group.add(leaf);
+  }
+  group.position.set(x, 0, z);
+  return group;
+}
+
+function serverRack(x: number, z: number): THREE.Group {
+  const group = new THREE.Group();
+  const shell = material(0x18232e, .38, .58);
+  group.add(box(1.05, 2.75, .9, shell, 0, 1.37));
+  for (let index = 0; index < 9; index += 1) {
+    const module = box(.82, .18, .035, material(0x0e151d, .4, .62), 0, .32 + index * .27, -.47);
+    const light = box(.045, .045, .025, emissiveMaterial(0x38d68b, 0x38ff9e, 2), .31, .32 + index * .27, -.5);
+    group.add(module, light);
+  }
+  group.position.set(x, 0, z);
+  return group;
+}
+
+function cpuPackage(): THREE.Group {
+  const group = new THREE.Group();
+  const substrate = material(0x1f6b58, .55, .18);
+  const spreader = material(0xb9c3c8, .25, .86);
+  const darkMetal = material(0x2a343a, .3, .72);
+  group.add(box(1.02, .1, 1.02, substrate, 0, .07));
+  group.add(box(.73, .12, .73, spreader, 0, .17));
+  group.add(box(.49, .035, .49, darkMetal, 0, .245));
+  const contact = material(0xd6a94b, .28, .8);
+  for (let row = -4; row <= 4; row += 1) for (let column = -4; column <= 4; column += 1) {
+    if (Math.abs(row) < 2 && Math.abs(column) < 2) continue;
+    group.add(box(.035, .022, .035, contact, row * .1, .002, column * .1));
+  }
+  const corner = emissiveMaterial(0x184737, 0x40f5ad, .55);
+  group.add(box(.09, .035, .09, corner, -.42, .135, -.42));
+  group.name = 'product-chip';
+  return group;
+}
+
+function gpuFan(x: number): THREE.Group {
+  const fan = new THREE.Group();
+  const hub = cylinder(.09, .08, material(0x111820, .35, .68));
+  hub.rotation.x = Math.PI / 2;
+  fan.add(hub);
+  for (let blade = 0; blade < 9; blade += 1) {
+    const item = box(.055, .025, .23, material(0x1a222a, .4, .55), 0, 0, -.1);
+    item.rotation.z = blade / 9 * Math.PI * 2;
+    fan.add(item);
+  }
+  const ring = cylinder(.27, .045, material(0x202b35, .36, .68));
+  ring.rotation.x = Math.PI / 2;
+  fan.add(ring);
+  fan.position.x = x;
+  return fan;
+}
+
+function gpuCard(): THREE.Group {
+  const group = new THREE.Group();
+  const pcb = material(0x184f43, .52, .24);
+  const shroud = material(0x263747, .3, .64);
+  const copper = material(0xb87333, .24, .82);
+  group.add(box(1.62, .62, .08, pcb));
+  group.add(box(1.48, .56, .11, shroud, 0, 0, -.09));
+  group.add(box(1.46, .07, .11, copper, 0, -.28, .05));
+  const fanLeft = gpuFan(-.42);
+  const fanRight = gpuFan(.42);
+  fanLeft.position.z = -.17;
+  fanRight.position.z = -.17;
+  group.add(fanLeft, fanRight);
+  for (let index = -5; index <= 5; index += 1) group.add(box(.045, .12, .025, material(0xd8ab55, .26, .82), index * .09, -.37, .02));
+  for (let index = 0; index < 3; index += 1) {
+    const pipe = cylinder(.026, 1.25, copper, -.58 + index * .12, 0, .1, 12);
+    pipe.rotation.z = Math.PI / 2;
+    group.add(pipe);
+  }
+  group.name = 'product-gpu';
+  return group;
+}
+
+function partsShelf(x: number, z: number): THREE.Group {
+  const group = new THREE.Group();
+  const frame = material(0x26343f, .42, .62);
+  const crate = material(0x65717b, .72, .12);
+  group.add(box(2.2, .12, .72, frame, 0, .1), box(.12, 2.45, .12, frame, -1.02, 1.25), box(.12, 2.45, .12, frame, 1.02, 1.25));
+  for (let level = 0; level < 4; level += 1) {
+    group.add(box(2.1, .08, .72, frame, 0, .5 + level * .58));
+    for (let slot = -1; slot <= 1; slot += 1) {
+      const bin = box(.55, .34, .55, crate, slot * .66, .68 + level * .58);
+      group.add(bin);
