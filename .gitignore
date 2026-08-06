@@ -1,4 +1,6 @@
 node_modules/
+dist/
+.simtest/
 .wrangler/
 .dev.vars
 .DS_Store
