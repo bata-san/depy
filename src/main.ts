@@ -1,6 +1,8 @@
 import './styles.css';
+import { secondsPerWeek } from './game-clock';
 import { createOfficeScene, type OfficeScene } from './office';
-import { advanceWeek, loadState, saveState } from './simulation';
+import { openSaveScreen } from './save-screen';
+import { advanceRealtime, advanceWeek, createInitialState, normalizeState, saveState } from './simulation';
 import type { GameState, PanelId } from './types';
 import { GameUI } from './ui';
 
@@ -15,16 +17,23 @@ app.innerHTML = `
   </main>
 `;
 
-const uiRoot = document.querySelector<HTMLElement>('#ui-root');
-const canvasHost = document.querySelector<HTMLElement>('#office-canvas');
-const hotspotHost = document.querySelector<HTMLElement>('#office-hotspots');
-if (!uiRoot || !canvasHost || !hotspotHost) throw new Error('Application hosts were not created');
+const uiRootCandidate = document.querySelector<HTMLElement>('#ui-root');
+const canvasHostCandidate = document.querySelector<HTMLElement>('#office-canvas');
+const hotspotHostCandidate = document.querySelector<HTMLElement>('#office-hotspots');
+if (!uiRootCandidate || !canvasHostCandidate || !hotspotHostCandidate) throw new Error('Application hosts were not created');
+const uiRoot: HTMLElement = uiRootCandidate;
+const canvasHost: HTMLElement = canvasHostCandidate;
+const hotspotHost: HTMLElement = hotspotHostCandidate;
 
-let state: GameState = loadState();
+let state: GameState;
 let office: OfficeScene;
+let ui: GameUI;
 let lastFrame = performance.now();
 let weekAccumulator = 0;
+let renderAccumulator = 0;
+let saveAccumulator = 0;
 let renderQueued = false;
+let saveManagerOpen = false;
 
 const projectProgress = (): number => {
   const active = state.projects.find((project) => project.stage !== 'ready' && !project.paused);
@@ -57,27 +66,52 @@ const openPanel = (panel: PanelId): void => {
   scheduleRender();
 };
 
-const ui = new GameUI(uiRoot, state, {
-  onStateChange: scheduleRender,
-  onReset: (replacement) => {
-    state = replacement;
-    scheduleRender();
-  },
-});
-
-office = createOfficeScene(canvasHost, hotspotHost, openPanel);
-renderUI();
-
-const secondsPerWeek = (speed: GameState['speed']): number => {
-  if (speed === 0) return Number.POSITIVE_INFINITY;
-  if (speed === 1) return 6;
-  if (speed === 3) return 2.1;
-  return 0.72;
+const openManager = async (): Promise<void> => {
+  if (saveManagerOpen) return;
+  saveManagerOpen = true;
+  const previousSpeed = state.speed;
+  state.speed = 0;
+  saveState(state);
+  scheduleRender();
+  const replacement = await openSaveScreen({ currentState: state, createState: createInitialState, allowClose: true });
+  if (replacement) {
+    state = normalizeState(replacement);
+    weekAccumulator = 0;
+  } else {
+    state.speed = previousSpeed;
+  }
+  saveManagerOpen = false;
+  scheduleRender();
 };
+
+async function start(): Promise<void> {
+  const selected = await openSaveScreen({ createState: createInitialState });
+  state = normalizeState(selected ?? createInitialState());
+
+  ui = new GameUI(uiRoot, state, {
+    onStateChange: scheduleRender,
+    onReset: (replacement) => {
+      state = normalizeState(replacement);
+      saveState(state);
+      scheduleRender();
+    },
+    onOpenSaveManager: () => { void openManager(); },
+    onResetCamera: () => office.resetCamera(),
+  });
+
+  office = createOfficeScene(canvasHost, hotspotHost, openPanel);
+  renderUI();
+  requestAnimationFrame(loop);
+
+  const resizeObserver = new ResizeObserver(() => office.resize());
+  resizeObserver.observe(canvasHost);
+  window.addEventListener('beforeunload', () => saveState(state));
+}
 
 const loop = (now: number): void => {
   const deltaSeconds = Math.min(0.1, Math.max(0, (now - lastFrame) / 1000));
   lastFrame = now;
+
   office.update(deltaSeconds, {
     activePanel: state.activePanel,
     projectProgress: projectProgress(),
@@ -86,26 +120,37 @@ const loop = (now: number): void => {
     officeLevel: state.officeLevel,
     researchActive: Boolean(state.activeResearch && !state.activeResearch.paused),
     cashHealth: Math.max(0, Math.min(1, state.cash / 80_000_000)),
+    timeSpeed: state.speed,
   });
 
+  const realtimeChanged = advanceRealtime(state, deltaSeconds, state.speed);
   if (state.speed !== 0) {
     weekAccumulator += deltaSeconds;
     const threshold = secondsPerWeek(state.speed);
     if (weekAccumulator >= threshold) {
       weekAccumulator %= threshold;
       advanceWeek(state);
-      const active = document.activeElement as HTMLElement | null;
-      const editing = Boolean(active && uiRoot.contains(active) && (active.tagName === 'INPUT' || active.tagName === 'SELECT'));
-      if (!editing) renderUI();
+      app.classList.remove('week-tick');
+      requestAnimationFrame(() => app.classList.add('week-tick'));
+      window.setTimeout(() => app.classList.remove('week-tick'), 720);
+      scheduleRender();
     }
-  } else {
-    weekAccumulator = 0;
   }
 
+  renderAccumulator += deltaSeconds;
+  if (realtimeChanged && renderAccumulator >= 0.75) {
+    renderAccumulator = 0;
+    const active = document.activeElement as HTMLElement | null;
+    const editing = Boolean(active && uiRoot.contains(active) && (active.tagName === 'INPUT' || active.tagName === 'SELECT'));
+    if (!editing) scheduleRender();
+  }
+
+  saveAccumulator += deltaSeconds;
+  if (saveAccumulator >= 12) {
+    saveAccumulator = 0;
+    saveState(state);
+  }
   requestAnimationFrame(loop);
 };
-requestAnimationFrame(loop);
 
-const resizeObserver = new ResizeObserver(() => office.resize());
-resizeObserver.observe(canvasHost);
-window.addEventListener('beforeunload', () => saveState(state));
+void start();
