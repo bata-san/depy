@@ -158,6 +158,11 @@ export interface ProductHistoryPoint {
   marketShare: number;
 }
 
+export interface ProductFactoryAllocation {
+  contractId: string;
+  allocation: number;
+}
+
 export interface ReleasedProduct {
   id: string;
   projectId: string;
@@ -172,8 +177,10 @@ export interface ReleasedProduct {
   unitCost: number;
   metrics: TechnicalMetrics;
   audience: AudienceFit[];
-  factoryContractId: string;
-  allocation: number;
+  factoryAllocations: ProductFactoryAllocation[];
+  /** Legacy fields kept for automatic migration of older saves. */
+  factoryContractId?: string;
+  allocation?: number;
   inventory: number;
   lifetimeProduced: number;
   lifetimeSold: number;
@@ -276,10 +283,12 @@ export interface ResearchProgram {
 
 export interface Loan {
   id: string;
+  lender: string;
   principal: number;
   balance: number;
   weeklyPayment: number;
   remainingWeeks: number;
+  originalTermWeeks: number;
   interestRate: number;
 }
 
@@ -322,7 +331,8 @@ export interface DecisionChoice {
 
 export interface DecisionEvent {
   id: string;
-  kind: 'poach' | 'factory' | 'corporate' | 'leak' | 'quality' | 'patent';
+  source: 'market' | 'competitor' | 'factory' | 'internal';
+  kind: 'poach' | 'factory' | 'corporate' | 'quality' | 'competitive';
   title: string;
   description: string;
   choices: DecisionChoice[];
@@ -377,10 +387,9 @@ export interface GameState {
 
 export interface LaunchDraft {
   projectId: string;
-  factoryContractId: string;
+  factoryAllocations: ProductFactoryAllocation[];
   skuProfile: SkuProfile;
   price: number;
-  allocation: number;
   lifeWeeks: number;
   launchMarketing: number;
 }

@@ -4,7 +4,4 @@ dist/
 .wrangler/
 .dev.vars
 .DS_Store
-src/office.ts
-src/simulation.ts
-src/ui.ts
-src/styles.css
+*.log

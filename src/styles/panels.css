@@ -1,0 +1,44 @@
+.management-drawer { position: absolute; top: 92px; right: 12px; bottom: 25px; width: min(620px, 43vw); display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; animation: drawerIn .24s ease both; }
+.management-drawer > header { display: flex; justify-content: space-between; align-items: center; min-height: 57px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.management-drawer > header small { letter-spacing: .15em; font-size: 9px; }
+.management-drawer > header > div:last-child { display: flex; gap: 5px; }
+.management-drawer > header button { min-width: 34px; padding: 5px; }
+.management-drawer-body { min-height: 0; overflow: auto; padding: 13px; scrollbar-color: #33566d #101a23; }
+.management-drawer.compact { top: auto; bottom: 25px; width: 300px; height: 104px; grid-template-rows: auto 1fr; }
+.drawer-restore { margin: 8px; }
+@keyframes drawerIn { from { opacity: 0; transform: translateX(22px); } }
+.panel-section { display: grid; gap: 15px; }
+.section-head { display: flex; justify-content: space-between; gap: 15px; align-items: flex-start; }
+.section-head small { letter-spacing: .14em; font-size: 9px; }
+.section-head p { margin: 0; font-size: 12px; }
+.summary-strip, .finance-hero, .sales-hero { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 7px; }
+.summary-strip > div, .finance-hero > div, .sales-hero > div { min-width: 0; padding: 11px; background: rgba(8, 17, 24, .56); border: 1px solid rgba(136, 193, 228, .14); border-radius: 4px; }
+.summary-strip small, .finance-hero small, .sales-hero small { display: block; font-size: 9px; letter-spacing: .08em; }
+.summary-strip b, .finance-hero b, .sales-hero b { display: block; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; font-size: 16px; }
+.summary-strip span, .finance-hero span, .sales-hero span { color: var(--muted); font-size: 10px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; }
+.form-grid label, .design-controls > label, .product-actions label, .allocation-editor label, .launch-form label { display: grid; gap: 5px; color: #bcd0df; font-size: 11px; }
+.series-layout { display: grid; grid-template-columns: 176px minmax(0,1fr); gap: 12px; }
+.series-sidebar, .series-main { display: grid; align-content: start; gap: 9px; }
+.series-row { display: grid; grid-template-columns: 36px 1fr; gap: 2px 8px; text-align: left; background: rgba(10, 20, 28, .62); }
+.series-row span { grid-row: 1 / span 2; display: grid; place-items: center; color: #9cd8ff; font-size: 10px; font-weight: 900; }
+.series-row b { font-size: 12px; }.series-row small { font-size: 9px; }.series-row.selected { border-color: var(--accent); background: rgba(30, 91, 129, .55); }
+.new-series { display: grid; gap: 7px; padding: 9px; }
+.series-title { display: flex; justify-content: space-between; align-items: flex-start; }
+.design-grid { display: grid; grid-template-columns: minmax(250px,.9fr) minmax(280px,1.1fr); gap: 10px; }
+.design-controls, .design-preview { display: grid; align-content: start; gap: 11px; }
+.slider > span { display: flex; justify-content: space-between; }.slider input { padding: 0; accent-color: var(--accent); }
+.metric-quad { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+.metric-quad > div { display: grid; gap: 4px; min-width: 0; padding: 8px; background: rgba(7, 15, 22, .5); border-radius: 3px; }
+.metric-quad b { font-size: 15px; }
+.cost-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1px; margin: 0; background: rgba(127, 180, 216, .12); }
+.cost-list > div { display: flex; justify-content: space-between; gap: 7px; padding: 7px; background: #152430; }
+.cost-list dt { color: var(--muted); font-size: 10px; }.cost-list dd { margin: 0; font-size: 11px; font-weight: 800; }
+.audience-list { display: grid; gap: 6px; }.audience { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 7px; background: rgba(8,17,24,.48); }.audience small { grid-column: 1/-1; }
+.bottleneck { margin: 0; padding: 10px; border-left: 4px solid var(--accent); background: rgba(43, 113, 156, .12); }.bottleneck b { display: block; margin-bottom: 4px; }
+.project-list, .product-list, .factory-list, .factory-market, .competitor-list, .research-grid, .staff-grid, .candidate-grid, .facility-grid, .loan-grid, .active-loans { display: grid; gap: 10px; }
+.project-card header, .product-card header, .factory-card header, .staff-card header, .loan-card header { margin-bottom: 10px; }
+.project-percent, .rating { font-size: 23px; font-weight: 900; color: #a7ddff; }
+.mini-metrics { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 6px; margin: 9px 0; }.mini-metrics span { display: flex; justify-content: space-between; gap: 6px; padding: 6px; background: rgba(8,17,24,.45); color: var(--muted); font-size: 10px; }.mini-metrics b { color: var(--ink); }
+.issue { margin: 10px 0; padding: 10px; border-left: 4px solid var(--warning); background: rgba(126, 87, 30, .17); }.issue.critical { border-color: var(--bad); }.issue p { font-size: 11px; }.issue div, .project-card footer, .staff-card footer, .candidate-card footer, .factory-card footer { display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap; }
+.launch-form { margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--line); display: grid; gap: 9px; }.allocation-list, .allocation-editor { display: grid; gap: 7px; }.allocation-list label, .allocation-editor label { grid-template-columns: minmax(0,1fr) 110px; align-items: center; }.allocation-editor label span { display: grid; }

@@ -1,117 +1,137 @@
-# PC Frontier Lab — TypeScript / 3D Office Redesign Specification
+# PC Frontier Lab — Office-first TypeScript Redesign
 
-This document fixes the redesign requirements discussed after the first prototype. It is the implementation baseline for version 0.2.
+この文書は、初期プロトタイプ後に指定された再設計要件を実装基準として固定するものです。
 
-## Core experience
+## 1. 画面と操作
 
-The game begins in 2015 and runs continuously. The main screen is a living Three.js office rather than a menu dashboard. Desks, staff, the product display, server area, meeting room and management desk act as visual navigation points. Important decisions open compact management panels over the office.
+- メイン画面はボクセル調のThree.jsオフィス。
+- 3Dビューは常に主役として残し、管理画面は右側ドロワーで表示する。
+- UI再描画やパネル切り替えでカメラ位置を上書きしない。
+- カメラ位置とOrbitControlsの注視点をブラウザへ保存する。
+- パネルのスクロール位置、入力フォーカス、選択範囲を再描画後も維持する。
+- トーストは大きな文字、高コントラスト、優先度別の色、手動閉じる操作を持つ。
 
-The intended loop is:
+## 2. セーブデータ
 
-1. Build a long-running CPU or GPU series.
-2. Research enough to raise that series' technical ceiling.
-3. Design the next generation within technical and financial limits.
-4. Pay design, mask, prototype and validation costs while time advances.
-5. Contract a factory and reserve finite weekly capacity.
-6. Launch the generation with a price, production allocation and lifecycle.
-7. Read demand, actual sales, inventory, reviews and lost-sales reasons.
-8. Reinvest or fail while Intel, AMD, NVIDIA and fictional firms release competing generations.
+ゲーム起動時は必ずセーブデータマネージャーを表示する。
 
-## Interaction and UX
+- 続きから
+- 新規開始
+- 最大12スロット
+- 名前変更
+- 削除
+- JSON書き出し・読み込み
+- 選択スロットへの自動保存
+- 旧バージョンのセーブ移行
 
-- Time advances automatically, with pause, x1, x3 and x8 controls always visible.
-- The office is always visible behind the interface.
-- The left navigation contains only six high-level actions.
-- A single “next action” card explains the most urgent decision.
-- Product pages show current weekly sales, demand, demand fulfilment, inventory, rating, profit and trend before detailed data.
-- Positive and negative sales causes are written in plain language.
-- Design uses six main sliders. Detailed consequences are calculated and displayed automatically.
-- The player does not select a target market. Audience fit is inferred from performance, price, efficiency, reliability and series philosophy.
+## 3. 時間
 
-## Series and generations
+- 標準速度では実時間約5時間でゲーム内1年進行する。
+- 1週は約346秒。
+- 年月進行と開発・研究の進捗を分離する。
+- 標準的な世代開発は実時間約4分。
+- 研究は内容により約1〜3分。
+- 一時停止、1倍、3倍、8倍を用意する。
 
-A series owns a name, CPU/GPU category, design philosophy, brand value, accumulated technical legacy and generation count. Each release is the next generation of an existing series. A successful generation increases brand and legacy, allowing later products to start from a stronger position without removing research or cost constraints.
+## 4. シリーズと世代
 
-The initial company has one CPU series and one GPU series, but neither can reach late-game values. Slider caps depend on:
+- 製品は単発ではなくCPU・GPUシリーズに所属する。
+- シリーズ内で世代を更新する。
+- プレイヤーは対象市場を直接選ばない。
+- 性能、価格、効率、品質、ソフトウェア、シリーズ思想から購入層を自動推定する。
+- 初期状態では資金と技術上限の両方により最大仕様を作れない。
 
-- current year;
-- CPU/GPU research level;
-- series technical legacy;
-- office level.
+## 5. 開発と費用
 
-## Cost and difficulty model
+- 企画費
+- 詳細設計費
+- 週次開発費
+- マスク・テープアウト費
+- 試作費
+- 検証費
+- ソフトウェア費
+- 問題修正費
+- 設備費
+- 給与
+- 管理、知財、保険、税
+- 発売準備、流通、在庫、保証、サポート費
 
-The game must not allow a free maximum-spec product. Every generation can incur:
+開発問題では完全修正、暫定対策、強行を選び、費用、遅延、性能、信頼性へ影響する。
 
-- architecture and detailed-design cost;
-- weekly development burn;
-- mask and tooling cost;
-- prototype cost;
-- validation cost;
-- problem-resolution cost;
-- factory signup fee;
-- weekly manufacturing-capacity reservation;
-- per-unit manufacturing cost;
-- salaries and office overhead;
-- inventory holding cost;
-- support and warranty cost;
-- research expenditure.
+## 6. 社員
 
-A project pauses when funding becomes inadequate. A company with negative cash pauses the simulation. High performance can also lower yield, increase die size and thermals, increase development complexity and create expensive validation failures.
+社員は職種だけでなく、専門分野、特性、成長率、給与、士気、疲労、忠誠心を持つ。専門分野は設計性能、クロック、キャッシュ、歩留まり、電力、ドライバー、品質、ブランド、工場交渉へ直接反映する。
 
-## Factory system
+## 7. 工場
 
-Factories are contracted separately from development. Each foundry has an unlock year, process class, quality, reliability, cost multiplier, signup fee, minimum contract length and finite weekly capacity.
+- 初期状態で安価、低品質、小規模な工場と契約済み。
+- 同時に複数工場と契約可能。
+- 製品ごとに複数工場へ週産割当を設定可能。
+- 工場は能力、品質、信頼性、対応ノード、契約金、最低契約期間、立ち上げ期間、予約料、単価係数を持つ。
+- 販売数は在庫を超えない。
+- 需要に対する供給不足は機会損失として明示する。
+- 過剰在庫には保管費と終売時の処分損が発生する。
 
-A product receives a production allocation from one active factory contract. Weekly output is constrained by:
+## 8. 販売と評価
 
-- contracted capacity;
-- product allocation;
-- design yield;
-- factory reliability.
+商品画面の最上段で次を読めるようにする。
 
-Sales cannot exceed current inventory. Demand beyond supply is clearly reported as lost opportunity. Excess inventory produces holding cost. Contracts charge reservation fees even when capacity is unused.
+- 販売状態
+- 週間需要
+- 週間製造
+- 週間販売
+- 需要充足率
+- 在庫
+- 機会損失
+- 週間利益
+- 1個あたり利益
+- 累計売上と利益
+- 総合評価と媒体別評価
+- 売れた理由
+- 失速理由
+- 推奨する次の行動
+- 自動終売までの残り期間
 
-## Product lifecycle
+## 9. 競合
 
-At launch the player chooses price, production allocation and a 52–104 week lifecycle. The product automatically enters end-of-life when that date arrives. Demand follows a launch ramp and gradual decline, and competition can accelerate weak sales before EOL.
+Intel、AMD、NVIDIAを主要競合として扱う。将来モデルはゲーム内架空モデルと明示する。架空企業は参入、急成長、資金難、買収、撤退を行う。
 
-## Product evaluation and sales clarity
+## 10. イベント
 
-Each product shows:
+発生経路を市場、競合、工場、社内の4つに限定する。重要イベントは約1〜1.5年に1回とし、現在存在する製品、社員、契約工場へ直接関係する場合だけ生成する。
 
-- overall score out of 10;
-- performance, value, efficiency, reliability and software scores;
-- weekly demand and weekly sales;
-- demand fulfilment percentage;
-- weekly trend;
-- current inventory;
-- lifetime revenue and profit;
-- a demand-versus-sales history chart;
-- explicit reasons for strong sales;
-- explicit reasons for weak sales or lost sales;
-- remaining weeks until automatic EOL.
+## 11. 融資
 
-## Competition
+複数の金融機関を用意し、金額、金利、返済期間、利用条件を分ける。返済は毎週の固定費となり、工場増設や開発継続の手段である一方、経営を圧迫する。
 
-Intel, AMD and NVIDIA exist as long-running real-company competitors. Historical models use historical names for context. Models generated after the reliable historical period use clearly marked game-fictional names and are not presented as official roadmaps.
+## 12. 3D表現
 
-Fictional companies have cash, technology, brand, momentum and status. They can:
+全体をボクセル調へ統一する。キャラクターは外見バリエーションを持ち、タイピング、はんだ作業、検査、歩行、プレゼン、休憩など複数アニメーションを行う。GPUファン、研究装置、ウェハ検査台、サーバーLED、展示製品も状態に応じて動く。
 
-- enter the CPU or GPU market;
-- grow rapidly after a strong generation;
-- struggle after weak sales or high burn;
-- be acquired by a larger company;
-- leave the market.
+## 13. モジュール構成
 
-Competitors periodically launch new series models, change the market performance baseline and make old player products lose relevance.
+- `save-manager.ts`: セーブスロットと入出力
+- `save-screen.ts`: 起動時セーブUI
+- `game-clock.ts`: 年月と実時間の換算
+- `camera-controller.ts`: 3D視点の保存と操作
+- `character-animations.ts`: キャラクターモーション
+- `event-system.ts`: 4経路の重要イベント生成
+- `loan-system.ts`: 融資商品と審査
+- `office.ts`: 3Dオフィスシーン
+- `simulation.ts`: 経営シミュレーション
+- `ui.ts`: 管理ドロワーとHUD
+- `toast.ts`: 高視認性通知
 
-## Visual direction
+## 14. 追加モジュール分割
 
-The office uses original low-poly geometry with physically based materials, shadows, tone mapping, fog, multiple light sources, animated staff and a lit product showcase. The visual target is a readable management diorama, not a copy of any existing game's art, interface or assets.
-
-Future improvements should add employee pathfinding, office expansion, production-line visualization, richer product meshes and event cut-ins without replacing this office-first interaction model.
-
-## Implemented depth pass
-
-Version 0.2 also treats employee specialties as simulation inputs rather than labels. Architecture, clock, cache, yield, power, driver, quality, brand and supply specialists modify the corresponding product and company calculations. Quarterly management, intellectual-property and insurance expenses create additional cash pressure. Product analysis now recommends a next action and exposes inventory capital, unit margin and lost sales directly.
+- `state.ts`: 初期状態、正規化、通知、台帳、自動保存
+- `design-system.ts`: シリーズ、設計計算、開発、研究
+- `manufacturing-system.ts`: 工場契約、複数工場割当、販売、終売
+- `competitor-system.ts`: 実在主要企業と架空企業の盛衰
+- `company-system.ts`: 人材、設備、固定費、融資返済
+- `office-models.ts`: ボクセル家具、製品、設備、キャラクター造形
+- `ambient-animations.ts`: 配送ロボ、照明、データ表示の環境アニメーション
+- `ui-development.ts`: シリーズ・世代開発UI
+- `ui-business.ts`: 製品、工場、競合UI
+- `ui-company.ts`: 研究、人材、設備、融資UI
+- `styles/`: HUD、管理パネル、ゲーム要素、セーブ画面の分割スタイル

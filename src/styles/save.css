@@ -1,0 +1,28 @@
+.save-manager-overlay { position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; padding: 20px; background: radial-gradient(circle at 50% 30%, rgba(32,78,105,.42), rgba(2,8,12,.95)); opacity: 0; transition: opacity .22s; }.save-manager-overlay.visible { opacity: 1; }.save-manager-overlay.closing { opacity: 0; }
+.save-manager-window { width: min(920px, 96vw); max-height: min(820px, 94vh); display: grid; grid-template-rows: auto auto minmax(0,1fr) auto; overflow: hidden; }
+.save-manager-window > header { display: flex; justify-content: space-between; gap: 16px; padding: 20px; border-bottom: 1px solid var(--line); background: linear-gradient(135deg, rgba(39,95,132,.42), transparent); }.save-manager-window > header small { letter-spacing: .18em; }.save-manager-window > header p { margin: 6px 0 0; }.save-close { align-self: start; font-size: 20px; }
+.save-manager-toolbar { display: flex; gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--line); }.save-manager-toolbar .large { min-width: 185px; }
+.save-slot-list { min-height: 180px; overflow: auto; display: grid; align-content: start; gap: 9px; padding: 14px 20px; }
+.save-slot { display: grid; grid-template-columns: 76px minmax(0,1fr) auto; gap: 14px; align-items: center; padding: 12px; background: rgba(11,22,31,.72); border: 1px solid rgba(139,195,230,.17); border-radius: 5px; box-shadow: 0 4px 0 rgba(0,0,0,.24); }
+.save-slot-preview { position: relative; display: grid; place-items: center; width: 70px; height: 55px; overflow: hidden; color: white; font-weight: 900; background: linear-gradient(145deg,#356c8d,#162d3d); border: 2px solid #679cc0; box-shadow: inset -7px -7px rgba(0,0,0,.2); }.save-slot-preview i { position: absolute; left: 8px; right: 8px; bottom: 8px; height: 6px; background: #66d7a7; box-shadow: 14px -10px #5caeee, 32px -3px #ffc16d; }
+.save-slot-copy { min-width: 0; }.save-slot-copy h2 { margin: 3px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.save-slot-copy p { margin: 0; font-size: 11px; }.save-slot-actions { display: grid; grid-template-columns: repeat(2, minmax(90px,1fr)); gap: 6px; }
+.save-empty { padding: 55px; text-align: center; border: 1px dashed rgba(144,199,233,.25); }.save-empty b { font-size: 18px; }
+.save-manager-window > footer { display: flex; justify-content: space-between; gap: 10px; padding: 10px 20px; color: var(--muted); border-top: 1px solid var(--line); font-size: 10px; }
+@media (max-width: 980px) {
+  .top-hud { grid-template-columns: minmax(190px,1fr) repeat(2,minmax(105px,.6fr)) auto; }
+  .top-hud .hud-stat:nth-of-type(3), .top-hud .progress-stat { display: none; }
+  .management-drawer { width: min(650px, calc(100vw - 106px)); }
+  .objective-card, .notification-rail { width: min(340px, calc(100vw - 480px)); }
+  .design-grid, .product-columns { grid-template-columns: 1fr; }
+  .product-actions { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (max-width: 720px) {
+  .top-hud { left: 6px; right: 6px; top: 6px; grid-template-columns: 1fr auto; min-height: 58px; }.top-hud .hud-stat { display: none; }.company-button { min-width: 0; }.company-button small { display: none; }
+  .quick-nav { left: 6px; top: 74px; width: 58px; }.nav-item { min-height: 45px; }.nav-item b { font-size: 15px; }.nav-item span { font-size: 8px; }
+  .objective-card { left: 72px; right: 6px; top: 75px; width: auto; }.notification-rail { left: 72px; top: 132px; width: calc(100vw - 78px); }
+  .management-drawer { left: 72px; right: 6px; top: 132px; bottom: 8px; width: auto; }.management-drawer.compact { left: auto; width: 250px; }
+  .series-layout, .summary-strip, .finance-hero, .sales-hero, .factory-market, .research-grid, .facility-grid, .loan-grid, .candidate-grid, .staff-grid, .decision-choices { grid-template-columns: 1fr; }
+  .series-sidebar { grid-template-columns: repeat(2,minmax(0,1fr)); }.new-series { grid-column: 1/-1; }
+  .metric-quad { grid-template-columns: 1fr 1fr; }.save-slot { grid-template-columns: 58px 1fr; }.save-slot-preview { width: 54px; }.save-slot-actions { grid-column: 1/-1; grid-template-columns: repeat(2,1fr); }.save-manager-window > footer { display: none; }
+  .legal-note { display: none; }
+}
