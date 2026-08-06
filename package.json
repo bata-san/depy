@@ -5,10 +5,9 @@
   "type": "module",
   "description": "TypeScript and Three.js PC hardware company management simulation",
   "scripts": {
-    "prepare:source": "node scripts/assemble.mjs",
-    "dev": "npm run prepare:source && vite",
-    "typecheck": "npm run prepare:source && tsc --noEmit",
-    "build": "npm run prepare:source && tsc --noEmit && vite build",
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && vite build",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy"
   },
@@ -17,8 +16,8 @@
   },
   "devDependencies": {
     "@types/three": "^0.180.0",
-    "typescript": "^5.8.3",
-    "vite": "^7.0.0",
-    "wrangler": "^4.0.0"
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6",
+    "wrangler": "^4.119.0"
   }
 }
