@@ -3,7 +3,7 @@
   "name": "pc-frontier-lab",
   "compatibility_date": "2026-08-06",
   "assets": {
-    "directory": "./public",
+    "directory": "./dist",
     "not_found_handling": "single-page-application"
   }
 }
