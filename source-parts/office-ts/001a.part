@@ -1,0 +1,97 @@
+      group.add(box(.28, .08, .02, emissiveMaterial(0x1b2d39, level % 2 ? 0x67caff : 0x63e7ad, .4), slot * .66, .7 + level * .58, -.29));
+    }
+  }
+  group.position.set(x, 0, z);
+  return group;
+}
+
+function waferInspectionStation(x: number, z: number): THREE.Group {
+  const group = new THREE.Group();
+  const shell = material(0xd6dde1, .38, .34);
+  const dark = material(0x22313d, .38, .62);
+  group.add(box(1.9, 1.45, 1.2, shell, 0, .73));
+  group.add(box(1.45, .58, .82, dark, 0, 1.35));
+  const window = box(1.12, .37, .025, emissiveMaterial(0x143449, 0x5fd8ff, 1.1), 0, 1.42, -.43);
+  window.name = 'wafer-screen';
+  group.add(window);
+  const platter = cylinder(.42, .07, material(0xaebbc3, .22, .78), 0, .94, -.18, 32);
+  platter.name = 'wafer-platter';
+  group.add(platter);
+  for (let index = 0; index < 3; index += 1) group.add(box(.22, .08, .04, emissiveMaterial(0x172b35, index === 2 ? 0xffb969 : 0x63e7ad, .8), -.48 + index * .48, .5, -.62));
+  group.position.set(x, 0, z);
+  return group;
+}
+
+function productShowcase(x: number, z: number): THREE.Group {
+  const group = new THREE.Group();
+  const base = material(0x1c2a38, .34, .62);
+  const trim = material(0x647987, .28, .74);
+  const glass = new THREE.MeshPhysicalMaterial({ color: 0xbce8ff, transparent: true, opacity: .16, transmission: .78, roughness: .1, metalness: .02 });
+  group.add(box(3.25, .36, 1.9, base, 0, .18), box(3.12, .045, 1.78, trim, 0, .39));
+  const chip = cpuPackage();
+  chip.position.set(-.68, .66, 0);
+  chip.rotation.x = -.18;
+  chip.rotation.z = .08;
+  const gpu = gpuCard();
+  gpu.position.set(.62, .92, 0);
+  gpu.rotation.y = -.14;
+  group.add(chip, gpu, box(3.05, 1.68, 1.68, glass, 0, 1.15));
+  const light = new THREE.PointLight(0x42d8b3, 18, 5, 2);
+  light.position.set(0, 2.2, 0);
+  light.name = 'showcase-light';
+  group.add(light);
+  group.position.set(x, 0, z);
+  return group;
+}
+
+function researchBench(x: number, z: number): THREE.Group {
+  const group = new THREE.Group();
+  const steel = material(0x283643, .4, .52);
+  const bench = box(3.2, .14, 1.18, material(0x71808c, .58, .24), 0, 1.02);
+  group.add(bench, box(.12, 1, .12, steel, -1.35, .5, -.42), box(.12, 1, .12, steel, 1.35, .5, -.42), box(.12, 1, .12, steel, -1.35, .5, .42), box(.12, 1, .12, steel, 1.35, .5, .42));
+  const scope = box(.9, .52, .62, material(0x1d2a36, .38, .52), -.72, 1.36, -.05);
+  const scopeScreen = box(.54, .3, .025, emissiveMaterial(0x11283a, 0x5ec6ff, 1.7), -.72, 1.41, -.38);
+  scopeScreen.name = 'research-screen';
+  const chamber = cylinder(.42, .76, new THREE.MeshPhysicalMaterial({ color: 0x8bd4ff, transparent: true, opacity: .2, transmission: .62, roughness: .18 }), .65, 1.43, .02, 24);
+  chamber.name = 'research-chamber';
+  group.add(scope, scopeScreen, chamber, box(.72, .08, .5, material(0x173d31, .42, .45), .65, 1.08));
+  group.position.set(x, 0, z);
+  return group;
+}
+
+function meetingArea(x: number, z: number): THREE.Group {
+  const group = new THREE.Group();
+  const wood = material(0x7f5b42, .64);
+  const metal = material(0x26333f, .42, .5);
+  group.add(box(4.1, .18, 2.05, wood, 0, 1.02));
+  group.add(box(.38, .92, .38, metal, -1.45, .5), box(.38, .92, .38, metal, 1.45, .5));
+  for (const [chairX, chairZ, rotation] of [[-1.1, -1.45, 0], [0, -1.45, 0], [1.1, -1.45, 0], [-1.1, 1.45, Math.PI], [0, 1.45, Math.PI], [1.1, 1.45, Math.PI]] as [number, number, number][]) {
+    const item = chair(0x30465b);
+    item.position.set(chairX, 0, chairZ);
+    item.rotation.y = rotation;
+    group.add(item);
+  }
+  const tableScreen = box(1.3, .05, .76, emissiveMaterial(0x10263b, 0x4ca8ff, 1), 0, 1.13);
+  group.add(tableScreen);
+  group.position.set(x, 0, z);
+  return group;
+}
+
+function wallDisplay(x: number, y: number, z: number, width: number, color: number, name: string): THREE.Group {
+  const group = new THREE.Group();
+  const frame = material(0x17212c, .36, .54);
+  group.add(box(width + .16, 1.5, .12, frame, 0, 0));
+  const screen = box(width, 1.34, .035, emissiveMaterial(0x102236, color, 1.25), 0, 0, -.08);
+  screen.name = name;
+  group.add(screen);
+  for (let index = 0; index < 5; index += 1) {
+    const bar = box(.18 + index * .12, .05, .02, material(0xffffff, .5), -width / 2 + .38 + index * .52, -.42 + index * .16, -.105);
+    group.add(bar);
+  }
+  group.position.set(x, y, z);
+  return group;
+}
+
+function cityBackdrop(scene: THREE.Scene): void {
+  const city = new THREE.Group();
+  const buildingMaterial = material(0x111a25, .9);
