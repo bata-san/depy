@@ -1,0 +1,98 @@
+  const windowMaterial = emissiveMaterial(0x18283b, 0xf1bc67, .35);
+  for (let index = 0; index < 18; index += 1) {
+    const width = .8 + Math.random() * 1.5;
+    const height = 2.5 + Math.random() * 7;
+    const building = box(width, height, 1.2, buildingMaterial, -8 + index * .95, height / 2 - .4, -9.5 - Math.random() * 3);
+    city.add(building);
+    for (let floor = .5; floor < height - .4; floor += .55) {
+      if (Math.random() < .58) city.add(box(width * .55, .08, .03, windowMaterial, building.position.x, floor, building.position.z - .62));
+    }
+  }
+  scene.add(city);
+}
+
+export function createOfficeScene(canvasHost: HTMLElement, overlay: HTMLElement, open: (id: PanelId) => void): OfficeScene {
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x111a26);
+  scene.fog = new THREE.FogExp2(0x111a26, .014);
+
+  const camera = new THREE.PerspectiveCamera(33, 1, .1, 140);
+  camera.position.set(16, 14.2, 18.8);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  (renderer as unknown as { toneMappingExposure: number }).toneMappingExposure = 1.08;
+  canvasHost.append(renderer.domElement);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.enablePan = false;
+  controls.enableRotate = true;
+  controls.minDistance = 14;
+  controls.maxDistance = 31;
+  controls.maxPolarAngle = Math.PI * .47;
+  controls.target.set(0, 1.25, 0);
+
+  scene.add(new THREE.HemisphereLight(0xd8eeff, 0x1b2633, 2.15));
+  const sun = new THREE.DirectionalLight(0xffe3bd, 4.4);
+  sun.position.set(-9, 14, 7);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -14;
+  sun.shadow.camera.right = 14;
+  sun.shadow.camera.top = 14;
+  sun.shadow.camera.bottom = -14;
+  scene.add(sun);
+  const coolFill = new THREE.PointLight(0x4b9fff, 32, 19, 2);
+  coolFill.position.set(5.5, 5.5, -2.5);
+  scene.add(coolFill);
+  const warmFill = new THREE.PointLight(0xffb867, 28, 15, 2);
+  warmFill.position.set(-5, 4.2, 3.8);
+  scene.add(warmFill);
+
+  cityBackdrop(scene);
+  const office = new THREE.Group();
+  addFloorTiles(office);
+  const wallMaterial = material(0x253442, .82);
+  office.add(box(16.4, 5.6, .28, wallMaterial, 0, 2.65, -6.12), box(.28, 5.6, 12.4, wallMaterial, -8.12, 2.65, 0));
+  office.add(box(16.4, .18, .3, material(0x111a24, .55, .45), 0, 5.45, -6));
+  for (const x of [-6.2, -3.7, -1.2, 1.3, 3.8, 6.3]) {
+    office.add(box(2.1, 2.85, .1, new THREE.MeshPhysicalMaterial({ color: 0x7db6d9, transparent: true, opacity: .18, transmission: .55, roughness: .18 }), x, 3.28, -6));
+    office.add(box(.08, 3.1, .15, material(0x15222d, .45, .55), x - 1.08, 3.28, -5.94));
+  }
+  office.add(box(5.4, .08, 3.55, material(0x203b50, .9), -3.65, .04, -2.05));
+  office.add(box(4.25, .08, 3.45, material(0x3b2c42, .9), 3.7, .04, 2.85));
+
+  const developmentDesks = [
+    desk(-5.55, -3.7, 0, 0x5aaeff),
+    desk(-2.85, -3.7, 0, 0x62c9ff),
+    desk(-5.55, -.9, Math.PI, 0x6fd6b0),
+    desk(-2.85, -.9, Math.PI, 0xffbc6b),
+  ];
+  developmentDesks.forEach((item) => office.add(item));
+
+  const operationsDesk = desk(4.9, -3.65, 0, 0x79d8ff);
+  const competitorDesk = desk(1.9, -3.65, 0, 0xff7c88);
+  office.add(operationsDesk, competitorDesk);
+
+  const research = researchBench(-4.85, 3.9);
+  const showcase = productShowcase(4.65, 3.65);
+  const meeting = meetingArea(.2, 3.5);
+  office.add(research, showcase, meeting);
+
+  const racks = [serverRack(6.85, -1.15), serverRack(5.55, -1.15), serverRack(6.85, 1.05)];
+  racks.forEach((item) => office.add(item));
+  const waferStation = waferInspectionStation(-7.02, 2.55);
+  office.add(waferStation, partsShelf(7.02, 3.25));
+  const cableTray = material(0x192631, .4, .68);
+  office.add(box(13.8, .16, .38, cableTray, -.1, 4.95, -4.9), box(.36, .16, 8.4, cableTray, 7.25, 4.95, -.8));
+  for (let x = -6.2; x <= 6.2; x += 1.55) office.add(box(.07, .1, .28, emissiveMaterial(0xffffff, 0x8ecfff, .32), x, 4.87, -4.91));
+
+  const competitorScreen = wallDisplay(2.2, 3.9, -5.93, 3.4, 0xff626e, 'competitor-screen');
+  const financeScreen = wallDisplay(5.9, 3.9, -5.93, 2.7, 0x70d8a4, 'finance-screen');
+  office.add(competitorScreen, financeScreen);
+
