@@ -109,15 +109,43 @@ export function teamChemistry(state: GameState): number {
   return clamp(teamwork * .48 + morale * .3 + roles * 3.1 + communicator - fatigue * .12);
 }
 
+/**
+ * Business time advances every few real seconds, so condition values must not be
+ * treated as literal week-by-week additive damage. Instead each update eases the
+ * employee toward a sustainable target. This prevents a normal team from racing
+ * to fatigue 100 / morale 0 while still making long heavy workloads visible.
+ */
 export function staffWeeklyConditionDelta(member: StaffMember, workload: number, chemistry: number): { fatigue: number; morale: number; xp: number } {
   const profile = staffLifeProfile(member);
-  const workloadPressure = Math.max(0, workload);
+  const workloadPressure = clamp(Math.max(0, workload), 0, 4);
   const resilience = profile.resilience / 100;
-  const fatigue = workloadPressure > 0
-    ? (1.05 + workloadPressure) * (1.18 - resilience * .52)
-    : -3.4 - resilience * .7;
-  const morale = chemistry >= 72 ? .55 : chemistry < 42 ? -.8 : .1;
-  const xp = workloadPressure > 0 ? 1.8 + workloadPressure * .55 + profile.ambition / 75 : .2;
+
+  const targetFatigue = clamp(
+    20 + workloadPressure * 12 - resilience * 10
+      + (member.traits.includes('workhorse') ? -6 : 0)
+      + (member.traits.includes('temperamental') ? 4 : 0),
+    12,
+    76,
+  );
+  let fatigue = (targetFatigue - member.fatigue) * .075;
+  if (member.fatigue >= 92) fatigue = Math.min(fatigue, -2.2);
+  else if (member.fatigue >= 82) fatigue = Math.min(fatigue, -.9);
+  fatigue = clamp(fatigue, -3.2, 1.35);
+
+  const expectedFatigue = clamp(member.fatigue + fatigue, 0, 100);
+  const targetMorale = clamp(
+    58 + chemistry * .23 + (member.loyalty - 50) * .07 - Math.max(0, expectedFatigue - 55) * .27
+      + (member.traits.includes('communicator') ? 4 : 0)
+      - (member.traits.includes('temperamental') ? 3 : 0),
+    38,
+    92,
+  );
+  let morale = (targetMorale - member.morale) * .055;
+  if (member.morale <= 12) morale = Math.max(morale, 2.4);
+  else if (member.morale <= 28) morale = Math.max(morale, 1.25);
+  morale = clamp(morale, -1.25, 2.8);
+
+  const xp = workloadPressure > .05 ? .45 + workloadPressure * .22 + profile.ambition / 180 : .08;
   return { fatigue, morale, xp };
 }
 
