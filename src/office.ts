@@ -4,13 +4,15 @@ import { AmbientAnimationSystem } from './ambient-animations';
 import { CameraController } from './camera-controller';
 import { cityBackdrop } from './city-backdrop';
 import { buildOfficeLayout } from './office-layout';
-import type { PanelId } from './types';
+import type { StaffVisualState } from './character-animations';
+import type { PanelId, StaffRole } from './types';
 
 export interface OfficeSnapshot {
   activePanel: PanelId;
   projectProgress: number;
   productGlow: number;
   staffCount: number;
+  staff: StaffVisualState[];
   officeLevel: number;
   researchActive: boolean;
   cashHealth: number;
@@ -30,9 +32,35 @@ interface Hotspot {
   marker: HTMLButtonElement;
 }
 
+interface SpeechMarker {
+  root: HTMLDivElement;
+  name: HTMLElement;
+  line: HTMLElement;
+  staffIndex: number;
+}
+
+const roleLines: Record<StaffRole, string[]> = {
+  architect: ['次の世代、ここを変えたい。', '帯域の詰まりを先に潰そう。', 'この設計ならまだ伸ばせる。', '仕様を一度整理しよう。'],
+  circuit: ['配線、もう一段詰められる。', 'ここはタイミングが厳しいな。', '試作で確認してみよう。', '歩留まりも見ながら攻める。'],
+  thermal: ['温度マージンが少ない。', '電源回りを見直そう。', '冷却側から性能を稼げるかも。', '熱密度が上がってきた。'],
+  software: ['ドライバー側で吸収できそう。', 'この不具合、再現条件を絞る。', '互換性テストを増やしたい。', '更新で評価を戻せる。'],
+  validation: ['この条件でもう一周テスト。', '量産前にここだけ潰したい。', '再現した。原因を追う。', '品質は妥協したくない。'],
+  marketing: ['この価格なら訴求を変えよう。', '競合より何が刺さるか考える。', '発売初動を取りにいこう。', 'この製品、見せ方で化ける。'],
+  operations: ['ラインの負荷が上がってる。', '供給枠、もう一本欲しいな。', '在庫と需要を合わせよう。', '工場側と条件を詰める。'],
+};
+
+const tiredLines = ['ちょっと休憩したい…。', '集中が切れてきた。', '今日は長いな…。'];
+const lowMoraleLines = ['最近うまく噛み合わないな。', '一度立て直したい。', 'このままだと厳しいかも。'];
+const happyLines = ['いい流れ。次もいけそう。', '今のチーム、かなり噛み合ってる。', 'この結果はうれしい。'];
+
 const materialIntensity = (mesh: THREE.Mesh, value: number): void => {
   if (mesh.material instanceof THREE.MeshStandardMaterial) mesh.material.emissiveIntensity = value;
 };
+
+function lineFor(member: StaffVisualState, animation: string, epoch: number): string {
+  const pool = member.fatigue >= 82 ? tiredLines : member.morale <= 30 ? lowMoraleLines : member.morale >= 88 && animation === 'celebrating' ? happyLines : roleLines[member.role];
+  return pool[(epoch + member.name.length + member.id.length) % pool.length] ?? pool[0] ?? '';
+}
 
 export function createOfficeScene(
   canvasHost: HTMLElement,
@@ -60,7 +88,7 @@ export function createOfficeScene(
   const controls = new OrbitControls(camera, renderer.domElement);
   const cameraController = new CameraController(camera, controls);
   controls.minDistance = 8.5;
-  controls.maxDistance = 38;
+  controls.maxDistance = 62;
   controls.minPolarAngle = Math.PI * .12;
   controls.maxPolarAngle = Math.PI * .49;
 
@@ -70,19 +98,19 @@ export function createOfficeScene(
   sun.position.set(-10, 15, 8);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
-  sun.shadow.camera.left = -12;
-  sun.shadow.camera.right = 12;
-  sun.shadow.camera.top = 11;
-  sun.shadow.camera.bottom = -11;
+  sun.shadow.camera.left = -24;
+  sun.shadow.camera.right = 24;
+  sun.shadow.camera.top = 22;
+  sun.shadow.camera.bottom = -18;
   sun.shadow.camera.near = 3;
-  sun.shadow.camera.far = 34;
+  sun.shadow.camera.far = 48;
   sun.shadow.bias = -.00035;
   scene.add(sun);
 
   const windowFill = new THREE.DirectionalLight(0x78bfff, 1.05);
   windowFill.position.set(0, 7, -12);
   scene.add(windowFill);
-  const localGlow = new THREE.PointLight(0x6dbdff, 18, 18, 2);
+  const localGlow = new THREE.PointLight(0x6dbdff, 18, 24, 2);
   localGlow.position.set(2.5, 4.2, -.6);
   scene.add(localGlow);
 
@@ -112,6 +140,16 @@ export function createOfficeScene(
     return { id, object, marker };
   });
 
+  const speechMarkers: SpeechMarker[] = Array.from({ length: 4 }, () => {
+    const root = document.createElement('div');
+    root.className = 'employee-speech';
+    const name = document.createElement('b');
+    const line = document.createElement('span');
+    root.append(name, line);
+    overlay.append(root);
+    return { root, name, line, staffIndex: -1 };
+  });
+
   const progressScreens = layout.developmentDesks
     .map((desk) => desk.getObjectByName('screen'))
     .filter((item): item is THREE.Mesh => item instanceof THREE.Mesh);
@@ -133,12 +171,14 @@ export function createOfficeScene(
 
   const clock = new THREE.Clock();
   let snapshot: OfficeSnapshot = {
-    activePanel: 'home', projectProgress: 0, productGlow: .1, staffCount: 5,
+    activePanel: 'home', projectProgress: 0, productGlow: .1, staffCount: 5, staff: [],
     officeLevel: 1, researchActive: false, cashHealth: .5, timeSpeed: 1,
   };
   let qualitySeconds = 0;
   let qualityFrames = 0;
   let hotspotSeconds = 0;
+  let speechSeconds = 0;
+  let speechEpoch = -1;
 
   const resize = (): void => {
     const rect = canvasHost.getBoundingClientRect();
@@ -183,6 +223,36 @@ export function createOfficeScene(
     });
   };
 
+  const assignSpeech = (epoch: number): void => {
+    const available = Math.min(snapshot.staff.length, layout.people.length);
+    if (!available) { speechMarkers.forEach((marker) => { marker.staffIndex = -1; marker.root.style.opacity = '0'; }); return; }
+    speechMarkers.forEach((marker, slot) => {
+      const index = (epoch * 3 + slot * 7) % available;
+      const member = snapshot.staff[index];
+      const person = layout.people[index];
+      if (!member || !person || !person.parent?.visible) { marker.staffIndex = -1; marker.root.style.opacity = '0'; return; }
+      marker.staffIndex = index;
+      marker.name.textContent = member.name;
+      marker.line.textContent = lineFor(member, String(person.userData.animation ?? ''), epoch + slot);
+    });
+  };
+
+  const updateSpeechPositions = (): void => {
+    const rect = canvasHost.getBoundingClientRect();
+    const point = new THREE.Vector3();
+    speechMarkers.forEach((marker) => {
+      const person = marker.staffIndex >= 0 ? layout.people[marker.staffIndex] : undefined;
+      if (!person || snapshot.activePanel !== 'home' || !person.parent?.visible) { marker.root.style.opacity = '0'; return; }
+      person.getWorldPosition(point);
+      point.y += 2.25;
+      point.project(camera);
+      const visible = point.z < 1 && Math.abs(point.x) < 1.05 && Math.abs(point.y) < 1.05;
+      marker.root.style.left = `${(point.x * .5 + .5) * rect.width}px`;
+      marker.root.style.top = `${(-point.y * .5 + .5) * rect.height}px`;
+      marker.root.style.opacity = visible ? '1' : '0';
+    });
+  };
+
   let frame = 0;
   const animate = (): void => {
     frame = requestAnimationFrame(animate);
@@ -192,8 +262,10 @@ export function createOfficeScene(
     cameraController.update(delta);
     updateAdaptiveResolution(rawDelta);
 
+    layout.expansionGroups.forEach((group, index) => { group.visible = snapshot.officeLevel >= index + 2; });
     layout.characterAnimations.update(time, {
       staffCount: snapshot.staffCount,
+      staff: snapshot.staff,
       projectActive: snapshot.projectProgress > 0 && snapshot.projectProgress < 100,
       researchActive: snapshot.researchActive,
       productActive: snapshot.productGlow > .16,
@@ -233,10 +305,11 @@ export function createOfficeScene(
     localGlow.intensity = 12 + lighting.night * 9 + snapshot.projectProgress * .08 + snapshot.productGlow * 5;
 
     hotspotSeconds += rawDelta;
-    if (hotspotSeconds >= .09) {
-      hotspotSeconds = 0;
-      updateHotspots();
-    }
+    if (hotspotSeconds >= .12) { hotspotSeconds = 0; updateHotspots(); }
+    speechSeconds += rawDelta;
+    const nextEpoch = Math.floor(time / 8.5);
+    if (nextEpoch !== speechEpoch) { speechEpoch = nextEpoch; assignSpeech(nextEpoch); }
+    if (speechSeconds >= .24) { speechSeconds = 0; updateSpeechPositions(); }
     renderer.render(scene, camera);
   };
   animate();
@@ -251,6 +324,7 @@ export function createOfficeScene(
       renderer.dispose();
       renderer.domElement.remove();
       hotspots.forEach((hotspot) => hotspot.marker.remove());
+      speechMarkers.forEach((marker) => marker.root.remove());
     },
   };
 }
