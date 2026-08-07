@@ -1,9 +1,11 @@
 import { RESEARCH_DEFINITIONS } from './data';
 import { researchDurationSeconds, STANDARD_DEVELOPMENT_SECONDS } from './game-clock';
-import { staffPairSynergy, teamChemistry } from './staff-life';
+import { rewardStaffSuccess, staffPairSynergy, teamChemistry } from './staff-life';
 import { addLedger, addNotice, clamp, uid } from './state';
 import { projectStaffEffect, researchStaffEffect } from './staff-effects';
-import type { DevelopmentProject, GameState, ProjectIssue, ProjectStage, StaffMember } from './types';
+import type { DevelopmentProject, GameState, ProjectIssue, ProjectStage, StaffMember, StaffRole } from './types';
+
+const ENGINEERING_ROLES: StaffRole[] = ['architect', 'circuit', 'thermal', 'software', 'validation'];
 
 function stageFor(progress: number): ProjectStage {
   if (progress >= 100) return 'ready';
@@ -72,6 +74,7 @@ function applyStageCraft(state: GameState, project: DevelopmentProject, stage: P
     const boost = 1.01 + Math.random() * (.014 + combo * .018);
     project.metrics.performance *= boost;
     project.metrics.efficiency = clamp(project.metrics.efficiency + 1.2 + Math.random() * 2.4 + combo, 10, 180);
+    rewardStaffSuccess(state, synergy >= 78 ? 2.6 : 1.6, ENGINEERING_ROLES, .6);
     addNotice(state, synergy >= 78 ? 'チームコンボ' : 'ひらめき', synergy >= 78
       ? `${leadName}を中心に部門間の連携が噛み合い、${project.codeName}の設計が一段洗練されました。`
       : `${leadName}を中心に設計上のブレイクスルーが発生。${project.codeName}の完成度が上がりました。`, 'good');
@@ -114,12 +117,17 @@ export function advanceStaffDrivenRealtime(state: GameState, deltaSeconds: numbe
       project.performancePenalty += weakness * .025;
       project.reliabilityPenalty += weakness * .045;
       const issueChance = clamp(project.metrics.risk / 235 * staff.issueRisk * (1.08 - chemistry / 600), .02, .58);
-      if (project.stage !== 'ready' && Math.random() < issueChance) project.issues.push(createIssue(project, staff.quality, Boolean(staff.weakRole)));
+      const issueCreated = project.stage !== 'ready' && Math.random() < issueChance;
+      if (issueCreated) project.issues.push(createIssue(project, staff.quality, Boolean(staff.weakRole)));
+      else if (project.stage !== 'ready') rewardStaffSuccess(state, staff.quality >= 78 ? 1.4 : .7, ENGINEERING_ROLES, .25);
 
       if (project.stage === 'ready') {
         state.stats.generationsLaunched += 1;
+        const successMorale = staff.quality >= 84 ? 8 : staff.quality >= 70 ? 5.5 : 3;
+        rewardStaffSuccess(state, successMorale, ENGINEERING_ROLES, staff.quality >= 70 ? 3 : 1.5);
+        rewardStaffSuccess(state, successMorale * .45, ['marketing', 'operations'], 1);
         const verdict = staff.quality >= 82 ? 'チームの完成度が高く、量産設計まできれいにまとまりました。' : staff.quality >= 65 ? '量産設計が完成しました。' : '完成しましたが、人材構成の弱さが製品品質に残っています。';
-        addNotice(state, '開発完了', `${project.codeName}: ${verdict} チーム相性 ${Math.round(chemistry)}。`, staff.quality >= 70 ? 'good' : 'warning');
+        addNotice(state, '開発完了', `${project.codeName}: ${verdict} チーム相性 ${Math.round(chemistry)}。社員の士気が上がりました。`, staff.quality >= 70 ? 'good' : 'warning');
       }
     }
     changed = true;
@@ -133,7 +141,8 @@ export function advanceStaffDrivenRealtime(state: GameState, deltaSeconds: numbe
     if (program.progress >= 100) {
       state.research[program.area] += 1;
       state.researchPoints += 22;
-      addNotice(state, '研究完了', `${RESEARCH_DEFINITIONS[program.area].name} Lv.${state.research[program.area]}を獲得しました。`, 'good');
+      rewardStaffSuccess(state, 4.5, ENGINEERING_ROLES, 1.5);
+      addNotice(state, '研究完了', `${RESEARCH_DEFINITIONS[program.area].name} Lv.${state.research[program.area]}を獲得しました。研究チームの士気が上がりました。`, 'good');
       state.activeResearch = null;
     }
     changed = true;
