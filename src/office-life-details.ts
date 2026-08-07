@@ -115,6 +115,13 @@ function floorPulse(): THREE.Mesh[] {
   return strips;
 }
 
+function focusLight(color: number, x: number, y: number, z: number, distance: number): THREE.PointLight {
+  const light = new THREE.PointLight(color, 0, distance, 2);
+  light.position.set(x, y, z);
+  light.castShadow = false;
+  return light;
+}
+
 export function buildOfficeLifeDetails(office: THREE.Group): OfficeLifeDetails {
   const everyday = new THREE.Group(); everyday.name = 'premium-office-feedback';
   everyday.add(snackBar(), projectBoard());
@@ -124,6 +131,12 @@ export function buildOfficeLifeDetails(office: THREE.Group): OfficeLifeDetails {
   const launch = launchRings(); everyday.add(launch.group);
   const ideas = ideaParticles(); everyday.add(ideas.group);
   const pulseStrips = floorPulse(); pulseStrips.forEach((mesh) => everyday.add(mesh));
+
+  const developmentLight = focusLight(0x67cfff, -4.2, 2.25, -2.45, 8.5);
+  const researchLight = focusLight(0x7d9dff, -5.15, 2.35, 3.9, 7.5);
+  const productLight = focusLight(0xffad68, 5.0, 2.25, 3.8, 7.5);
+  const loungeLight = focusLight(0xffbf7a, -7.0, 2.0, .9, 5.5);
+  everyday.add(developmentLight, researchLight, productLight, loungeLight);
 
   const prestige = new THREE.Group(); prestige.name = 'office-prestige';
   prestige.add(cylinder(.7, .18, material(0x1c2930, .4, .5), 0, .18, 5.6, 20));
@@ -147,6 +160,10 @@ export function buildOfficeLifeDetails(office: THREE.Group): OfficeLifeDetails {
       prestige.visible = state.officeLevel >= 4;
       achievement.group.visible = state.officeLevel >= 2 || state.productGlow > .32;
 
+      developmentLight.intensity = 2.4 + occupied * 2.4 + state.projectProgress / 100 * 11;
+      researchLight.intensity = state.researchActive ? 12 + Math.sin(time * 2.6) * 2.2 : 1.2 + occupied * .7;
+      loungeLight.intensity = 1.4 + state.night * (2.8 + Math.max(0, .55 - occupied) * 2.5);
+
       progress.nodes.forEach((node, index) => {
         if (!(node.material instanceof THREE.MeshStandardMaterial)) return;
         const unlocked = state.projectProgress >= index * 25;
@@ -166,6 +183,7 @@ export function buildOfficeLifeDetails(office: THREE.Group): OfficeLifeDetails {
       if (state.productGlow > previousProductGlow + .08 && state.productGlow > .55) celebrationUntil = time + 6;
       previousProductGlow = state.productGlow;
       const celebrating = time < celebrationUntil;
+      productLight.intensity = 2 + state.productGlow * 12 + (celebrating ? 6 : 0);
       launch.group.visible = state.productGlow > .22 || celebrating;
       launch.rings.forEach((ring, index) => {
         ring.rotation.z += .004 + state.productGlow * .01 + index * .001;
