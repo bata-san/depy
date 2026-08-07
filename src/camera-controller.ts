@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-const CAMERA_KEY = 'pc-frontier-lab-camera-v1';
+const CAMERA_KEY = 'pc-frontier-lab-camera-v2';
 
 interface CameraSnapshot {
   position: [number, number, number];
@@ -9,8 +9,8 @@ interface CameraSnapshot {
 }
 
 const defaultSnapshot: CameraSnapshot = {
-  position: [19.5, 16.2, 23.5],
-  target: [0, 1.2, 3.2],
+  position: [15.8, 12.4, 18.2],
+  target: [0, 1.15, .15],
 };
 
 function loadSnapshot(): CameraSnapshot {
@@ -32,11 +32,16 @@ export class CameraController {
     camera.position.fromArray(snapshot.position);
     controls.target.fromArray(snapshot.target);
     controls.enableDamping = true;
+    controls.dampingFactor = .085;
     controls.enablePan = true;
     controls.enableRotate = true;
-    controls.minDistance = 9;
-    controls.maxDistance = 62;
-    controls.maxPolarAngle = Math.PI * .49;
+    controls.minDistance = 7.2;
+    controls.maxDistance = 70;
+    controls.minPolarAngle = Math.PI * .13;
+    controls.maxPolarAngle = Math.PI * .48;
+    controls.rotateSpeed = .62;
+    controls.zoomSpeed = .82;
+    controls.panSpeed = .7;
     const events = controls as unknown as { addEventListener: (type: string, listener: () => void) => void };
     events.addEventListener('start', () => { this.interacting = true; });
     events.addEventListener('change', () => this.scheduleSave());
