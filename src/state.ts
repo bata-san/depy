@@ -5,7 +5,9 @@ import type {
   GameDate, GameState, LedgerEntry, NotificationItem, ProductSeries, RecruitCandidate, ResearchArea,
 } from './types';
 
-export const VERSION = 7;
+export const VERSION = 8;
+export const STARTING_CASH = 220_000_000;
+const EARLY_SAVE_CASH_FLOOR = 180_000_000;
 export const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 export const uid = (prefix = 'id'): string => `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 export const dateToIndex = (date: GameDate): number => date.year * 52 + date.week;
@@ -47,7 +49,7 @@ export function createInitialState(): GameState {
   const state: GameState = {
     version: VERSION,
     companyName: 'PC Frontier Lab',
-    date: { year: 2015, week: 1 }, absoluteWeek: 0, cash: 90_000_000, researchPoints: 120, reputation: 6,
+    date: { year: 2015, week: 1 }, absoluteWeek: 0, cash: STARTING_CASH, researchPoints: 120, reputation: 6,
     speed: 1, activePanel: 'home', companyTab: 'team', selectedSeriesId: 'frontier-core', selectedProductId: null,
     selectedProjectId: null, officeLevel: 1, research, activeResearch: null, series: initialSeries(), projects: [], products: [],
     contracts: [{ id: uid('contract'), factoryId: starter.id, startedAt: { year: 2015, week: 1 }, committedCapacity: Math.min(600, starter.weeklyCapacity), remainingWeeks: starter.minimumWeeks, setupRemaining: 0, active: true, reliabilityModifier: 1, modifierWeeks: 0 }],
@@ -59,11 +61,12 @@ export function createInitialState(): GameState {
     stats: { lifetimeRevenue: 0, lifetimeProfit: 0, lifetimeUnits: 0, generationsLaunched: 0, productsLaunched: 0, failedProjects: 0 },
   };
   addLedger(state, '創業資金', state.cash, 'other');
-  addNotice(state, '創業', '小規模なオフィスと低品質なHarbor 28nm工場から事業を開始しました。', 'info');
+  addNotice(state, '創業', '創業資金2.2億円で事業を開始しました。最初の製品発売までは固定費にも創業支援が入ります。', 'good');
   return state;
 }
 
 export function normalizeState(input: GameState): GameState {
+  const incomingVersion = Number(input.version ?? 0);
   const fresh = createInitialState();
   const state = { ...fresh, ...structuredClone(input), version: VERSION } as GameState;
   state.date = state.date ?? fresh.date;
@@ -78,12 +81,19 @@ export function normalizeState(input: GameState): GameState {
   state.ledger = Array.isArray(state.ledger) ? state.ledger : [];
   state.notifications = Array.isArray(state.notifications) ? state.notifications : [];
   state.facilities = Array.isArray(state.facilities) ? state.facilities : fresh.facilities;
+  state.stats = state.stats ?? fresh.stats;
   state.research = { ...fresh.research, ...(state.research ?? {}) };
   state.nextEventWeek ||= nextDecisionEventWeek(state.absoluteWeek, true);
   for (const product of state.products) {
     product.factoryAllocations ??= product.factoryContractId ? [{ contractId: product.factoryContractId, allocation: product.allocation ?? 500 }] : [];
     product.history ??= [];
     product.reasons ??= { positive: [], negative: [] };
+  }
+  if (incomingVersion < VERSION && state.stats.productsLaunched === 0 && state.cash < EARLY_SAVE_CASH_FLOOR) {
+    const grant = EARLY_SAVE_CASH_FLOOR - state.cash;
+    state.cash += grant;
+    addLedger(state, '創業追加資金', grant, 'other');
+    addNotice(state, '創業資金を再調整', `序盤バランス変更により¥${grant.toLocaleString()}を追加し、手元資金を最低1.8億円まで補填しました。`, 'good');
   }
   return state;
 }
