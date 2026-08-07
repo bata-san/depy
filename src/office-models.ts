@@ -1,4 +1,4 @@
-export { box, cylinder, emissiveMaterial, material, sphere } from './office-primitives';
+export { box, cylinder, emissiveMaterial, material, shadowed, sphere } from './office-primitives';
 export { addFloorTiles } from './office-floor';
 export { chair, desk, monitor } from './office-workstations';
 export { staffPerson } from './office-characters';
