@@ -77,9 +77,9 @@ export function projectStaffEffect(state: GameState, project: DevelopmentProject
   const lead = state.staff.find((member) => member.id === project.leadStaffId) ?? top[0]?.member;
   const leadPower = lead ? memberStagePower(lead, stage) : 0;
   const leadFit = lead ? (stageRoles[stage][lead.role] ?? .55) * (stageSpecialties[stage].includes(lead.specialty) ? 1.12 : 1) : .55;
-  const speed = clamp(.3 + power / 260 + coverage * .32 + leadPower / 420 * leadFit, .42, 2.45);
-  const quality = clamp(42 + power / 8.5 + coverage * 20 + leadPower / 12, 35, 100);
-  const issueRisk = clamp(1.52 - coverage * .55 - quality / 180 + (weakRole ? .24 : 0), .38, 1.75);
+  const speed = clamp(.16 + power / 380 + coverage * .22 + leadPower / 700 * leadFit, .34, 2.05);
+  const quality = clamp(32 + power / 10 + coverage * 28 + leadPower / 15, 28, 100);
+  const issueRisk = clamp(1.62 - coverage * .62 - quality / 175 + (weakRole ? .28 : 0), .34, 1.9);
   return { speed, quality, issueRisk, coverage, leadName: lead?.name ?? '未設定', weakRole };
 }
 
