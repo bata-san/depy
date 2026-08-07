@@ -111,7 +111,8 @@ export function staffPerson(color: number, x: number, z: number, rotation = 0, v
 
   const leftKnee = joint('left-knee', 0, -.39, 0);
   const rightKnee = joint('right-knee', 0, -.39, 0);
-  leftLeg.add(leftKnee, rightKnee);
+  leftLeg.add(leftKnee);
+  rightLeg.add(rightKnee);
   leftKnee.add(limb(.21, .36, .25, pants, -.18));
   rightKnee.add(limb(.21, .36, .25, pants, -.18));
 
