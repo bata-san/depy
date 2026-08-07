@@ -1,5 +1,10 @@
 import * as THREE from 'three';
-import { box, emissiveMaterial, material, sphere, trimBox } from './office-primitives';
+import { box, emissiveMaterial, material, sphere } from './office-primitives';
+import { cityWindowTexture } from './voxel-textures';
+
+export interface CityBackdropController {
+  update: (delta: number) => void;
+}
 
 function seededRandom(seed: number): () => number {
   let value = seed >>> 0;
@@ -9,88 +14,139 @@ function seededRandom(seed: number): () => number {
   };
 }
 
-function building(width: number, height: number, depth: number, color: number, windowColor: number, x: number, z: number, seed: number): THREE.Group {
-  const random = seededRandom(seed);
-  const group = new THREE.Group();
-  const facade = material(color, .8, .12);
-  const edge = material(new THREE.Color(color).multiplyScalar(.62).getHex(), .7, .24);
-  const body = trimBox(width, height, depth, facade, edge);
-  body.position.y = height / 2;
-  group.add(body);
-  const windowMatOn = emissiveMaterial(0x172435, windowColor, .55);
-  const windowMatOff = material(0x1a2733, .72, .1);
-  const columns = Math.max(2, Math.floor(width / .42));
-  const rows = Math.max(3, Math.floor(height / .52));
-  for (let row = 0; row < rows; row += 1) {
-    for (let column = 0; column < columns; column += 1) {
-      const lit = random() > .38;
-      const window = box(width / columns * .45, .14, .025, lit ? windowMatOn : windowMatOff,
-        -width / 2 + (column + .5) * width / columns,
-        .38 + row * (height - .7) / Math.max(1, rows - 1),
-        depth / 2 + .025);
-      window.castShadow = false;
-      group.add(window);
-    }
-  }
-  group.add(box(width * .42, .12, depth * .45, material(0x26333c, .5, .5), 0, height + .08, 0));
-  if (seed % 3 === 0) {
-    group.add(box(.06, 1.2, .06, material(0x687985, .35, .7), 0, height + .72, 0));
-    group.add(box(.14, .06, .14, emissiveMaterial(0x31171a, 0xff454f, 1.2), 0, height + 1.32, 0));
-  }
-  group.position.set(x, -.45, z);
-  return group;
+interface BuildingSpec {
+  x: number;
+  y: number;
+  z: number;
+  width: number;
+  height: number;
+  depth: number;
+  color: THREE.Color;
+  lightColor: THREE.Color;
 }
 
-export function cityBackdrop(scene: THREE.Scene): void {
+export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
   const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(90, 24, 16),
+    new THREE.SphereGeometry(90, 18, 12),
     new THREE.ShaderMaterial({
       side: THREE.BackSide,
+      depthWrite: false,
       uniforms: {
-        topColor: { value: new THREE.Color(0x0b182b) },
-        horizonColor: { value: new THREE.Color(0x35506a) },
-        bottomColor: { value: new THREE.Color(0xd38b68) },
+        topColor: { value: new THREE.Color(0x091426) },
+        horizonColor: { value: new THREE.Color(0x39546c) },
+        bottomColor: { value: new THREE.Color(0xc47c62) },
       },
-      vertexShader: 'varying vec3 vWorld; void main(){ vec4 world = modelMatrix * vec4(position,1.0); vWorld = world.xyz; gl_Position = projectionMatrix * viewMatrix * world; }',
-      fragmentShader: 'varying vec3 vWorld; uniform vec3 topColor; uniform vec3 horizonColor; uniform vec3 bottomColor; void main(){ float h=normalize(vWorld).y; vec3 c=mix(horizonColor,topColor,smoothstep(0.0,.65,h)); c=mix(bottomColor,c,smoothstep(-.18,.12,h)); gl_FragColor=vec4(c,1.0); }',
+      vertexShader: 'varying vec3 vWorld; void main(){ vec4 world=modelMatrix*vec4(position,1.0); vWorld=world.xyz; gl_Position=projectionMatrix*viewMatrix*world; }',
+      fragmentShader: 'varying vec3 vWorld; uniform vec3 topColor; uniform vec3 horizonColor; uniform vec3 bottomColor; void main(){ float h=normalize(vWorld).y; vec3 c=mix(horizonColor,topColor,smoothstep(.02,.72,h)); c=mix(bottomColor,c,smoothstep(-.16,.12,h)); gl_FragColor=vec4(c,1.0); }',
     }),
   );
   scene.add(sky);
 
   const city = new THREE.Group();
-  city.add(box(46, .5, 24, material(0x111923, .95), 0, -.72, -18));
-  const road = material(0x171f27, .92);
-  city.add(box(44, .08, 3.2, road, 0, -.42, -10.2));
-  for (let x = -20; x <= 20; x += 2.4) city.add(box(1.1, .025, .08, emissiveMaterial(0x2b2e2a, 0xffd57a, .3), x, -.37, -9.95));
+  city.add(box(50, .5, 28, material(0x101820, .96), 0, -.72, -19));
+  city.add(box(46, .08, 3.3, material(0x161f27, .94), 0, -.42, -10.25));
 
   const random = seededRandom(8713);
-  const colors = [0x1a2836, 0x202f3d, 0x182633, 0x26333e, 0x1c2d3a];
-  const windows = [0xffc978, 0x7bc8ff, 0xffa76c, 0xb4d8ff];
-  for (let layer = 0; layer < 3; layer += 1) {
-    const count = layer === 0 ? 12 : 16;
+  const facadePalette = [0x182735, 0x1d2d3b, 0x223340, 0x172532, 0x283844];
+  const lightPalette = [0xffd18a, 0x8fd6ff, 0xffad7c, 0xb7d9ff];
+  const specs: BuildingSpec[] = [];
+  for (let layer = 0; layer < 4; layer += 1) {
+    const count = layer === 0 ? 14 : 18;
     for (let index = 0; index < count; index += 1) {
-      const width = 1.1 + random() * (layer === 0 ? 1.4 : 2.2);
-      const height = 3 + random() * (layer === 0 ? 6 : 10);
-      const depth = 1.3 + random() * 1.3;
-      const x = -19 + index * (38 / (count - 1)) + (random() - .5) * .8;
-      const z = -13 - layer * 4.3 - random() * 2.2;
-      const item = building(width, height, depth, colors[Math.floor(random() * colors.length)] ?? colors[0]!, windows[Math.floor(random() * windows.length)] ?? windows[0]!, x, z, 300 + layer * 50 + index);
-      item.scale.setScalar(1 - layer * .08);
-      city.add(item);
+      const width = 1.1 + random() * (1.2 + layer * .42);
+      const height = 3.1 + random() * (5.5 + layer * 2.2);
+      const depth = 1.4 + random() * 1.8;
+      const scale = 1 - layer * .055;
+      specs.push({
+        x: -20 + index * (40 / Math.max(1, count - 1)) + (random() - .5) * .9,
+        y: height * scale / 2 - .45,
+        z: -13 - layer * 4.3 - random() * 2.4,
+        width: width * scale,
+        height: height * scale,
+        depth: depth * scale,
+        color: new THREE.Color(facadePalette[Math.floor(random() * facadePalette.length)] ?? facadePalette[0]!),
+        lightColor: new THREE.Color(lightPalette[Math.floor(random() * lightPalette.length)] ?? lightPalette[0]!),
+      });
     }
   }
 
-  for (let index = 0; index < 16; index += 1) {
-    const car = box(.42, .13, .22, material(index % 2 ? 0x8a4b4f : 0x4b718c, .45, .35), -18 + index * 2.35, -.27, -9.7 - (index % 2) * .85);
-    car.name = 'city-car';
-    car.userData.lane = index % 2;
-    car.userData.speed = .38 + (index % 5) * .045;
-    car.add(box(.075, .04, .018, emissiveMaterial(0x2b241d, index % 2 ? 0xffe5a4 : 0xff5f62, .8), index % 2 ? .18 : -.18, .01, .12));
-    city.add(car);
-  }
+  const buildingGeometry = new THREE.BoxGeometry(1, 1, 1);
+  const buildingMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .9, metalness: .06 });
+  const buildings = new THREE.InstancedMesh(buildingGeometry, buildingMaterial, specs.length);
+  buildings.frustumCulled = true;
+  const dummy = new THREE.Object3D();
+  specs.forEach((spec, index) => {
+    dummy.position.set(spec.x, spec.y, spec.z);
+    dummy.scale.set(spec.width, spec.height, spec.depth);
+    dummy.updateMatrix();
+    buildings.setMatrixAt(index, dummy.matrix);
+    buildings.setColorAt(index, spec.color);
+  });
+  buildings.instanceMatrix.needsUpdate = true;
+  if (buildings.instanceColor) buildings.instanceColor.needsUpdate = true;
+  city.add(buildings);
 
-  const moon = sphere(2.1, emissiveMaterial(0xf3e7cb, 0xffe5ba, .75), 16, 17, -42);
-  moon.castShadow = false;
+  const windowMaterial = new THREE.MeshBasicMaterial({
+    map: cityWindowTexture(),
+    color: 0xffffff,
+    toneMapped: false,
+  });
+  const windows = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), windowMaterial, specs.length);
+  specs.forEach((spec, index) => {
+    dummy.position.set(spec.x, spec.y, spec.z + spec.depth / 2 + .015);
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.set(spec.width * .82, spec.height * .84, 1);
+    dummy.updateMatrix();
+    windows.setMatrixAt(index, dummy.matrix);
+    windows.setColorAt(index, spec.lightColor);
+  });
+  windows.instanceMatrix.needsUpdate = true;
+  if (windows.instanceColor) windows.instanceColor.needsUpdate = true;
+  city.add(windows);
+
+  const stripeGeometry = new THREE.BoxGeometry(1, 1, 1);
+  const stripes = new THREE.InstancedMesh(stripeGeometry, emissiveMaterial(0x2b2e2a, 0xffd57a, .22), 18);
+  for (let index = 0; index < 18; index += 1) {
+    dummy.position.set(-20 + index * 2.35, -.37, -9.95);
+    dummy.scale.set(1.05, .025, .07);
+    dummy.updateMatrix();
+    stripes.setMatrixAt(index, dummy.matrix);
+  }
+  stripes.instanceMatrix.needsUpdate = true;
+  city.add(stripes);
+
+  const carCount = 12;
+  const carMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .45, metalness: .25 });
+  const cars = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), carMaterial, carCount);
+  const carState = Array.from({ length: carCount }, (_, index) => ({
+    x: -18 + index * 3.05,
+    z: -9.65 - (index % 2) * .92,
+    lane: index % 2,
+    speed: .44 + (index % 4) * .07,
+    color: new THREE.Color(index % 3 === 0 ? 0x9d5961 : index % 3 === 1 ? 0x477a9a : 0x6f8071),
+  }));
+  carState.forEach((car, index) => cars.setColorAt(index, car.color));
+  if (cars.instanceColor) cars.instanceColor.needsUpdate = true;
+  city.add(cars);
+
+  const moon = sphere(2.05, emissiveMaterial(0xf3e7cb, 0xffe5ba, .62), 15.5, 16.5, -42);
   city.add(moon);
   scene.add(city);
+
+  const updateCars = (delta: number): void => {
+    carState.forEach((car, index) => {
+      car.x += delta * car.speed * (car.lane === 0 ? 1 : -1);
+      if (car.x > 21) car.x = -21;
+      if (car.x < -21) car.x = 21;
+      dummy.position.set(car.x, -.28, car.z);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(.5, .14, .24);
+      dummy.updateMatrix();
+      cars.setMatrixAt(index, dummy.matrix);
+    });
+    cars.instanceMatrix.needsUpdate = true;
+  };
+  updateCars(0);
+
+  return { update: updateCars };
 }
