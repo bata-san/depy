@@ -4,6 +4,7 @@ import { openSaveScreen } from './save-screen';
 import { advanceRealtime, advanceWeek, createInitialState, normalizeState, saveState } from './simulation';
 import type { GameState, PanelId } from './types';
 import { GameUI } from './ui';
+import { realtimeStructureKey, updateRealtimeUI } from './ui-live';
 
 const app = document.querySelector<HTMLElement>('#app');
 if (!app) throw new Error('#app was not found');
@@ -32,12 +33,14 @@ let office: OfficeScene;
 let ui: GameUI;
 let lastFrame = performance.now();
 let weekAccumulator = 0;
-let renderAccumulator = 0;
+let liveAccumulator = 0;
 let saveAccumulator = 0;
 let renderQueued = false;
 let saveManagerOpen = false;
 let rangeDragging = false;
-let renderBlockedUntil = 0;
+let rangeInputEvent = false;
+let pendingStructuralRender = false;
+let structureKey = '';
 const secondsPerWeek = 5 * 60 * 60 / 52;
 
 const projectProgress = (): number => {
@@ -62,20 +65,36 @@ const updateRangeReadout = (input: HTMLInputElement): void => {
 };
 
 const renderUI = (): void => {
-  if (rangeDragging || performance.now() < renderBlockedUntil) return;
+  if (rangeDragging) {
+    pendingStructuralRender = true;
+    return;
+  }
   (state as LegacySpeedState).speed = saveManagerOpen ? 0 : 1;
   ui.setState(state);
   ui.render();
   removeLegacySpeedControls();
+  structureKey = realtimeStructureKey(state);
+  updateRealtimeUI(uiRoot, state);
 };
 
 const scheduleRender = (): void => {
-  if (renderQueued || rangeDragging || performance.now() < renderBlockedUntil) return;
+  if (rangeInputEvent) return;
+  if (rangeDragging) {
+    pendingStructuralRender = true;
+    return;
+  }
+  if (renderQueued) return;
   renderQueued = true;
   requestAnimationFrame(() => {
     renderQueued = false;
     renderUI();
   });
+};
+
+const flushPendingStructuralRender = (): void => {
+  if (!pendingStructuralRender || rangeDragging || rangeInputEvent) return;
+  pendingStructuralRender = false;
+  scheduleRender();
 };
 
 const openPanel = (panel: PanelId): void => {
@@ -94,6 +113,7 @@ const openManager = async (): Promise<void> => {
   if (replacement) {
     state = normalizeState(replacement);
     weekAccumulator = 0;
+    structureKey = '';
   }
   (state as LegacySpeedState).speed = 1;
   saveManagerOpen = false;
@@ -109,25 +129,30 @@ const installStableRangeHandling = (): void => {
   uiRoot.addEventListener('input', (event) => {
     const input = event.target;
     if (!(input instanceof HTMLInputElement) || input.type !== 'range') return;
-    rangeDragging = true;
+    rangeInputEvent = true;
     updateRangeReadout(input);
-    // The existing UI input handler still updates its draft model. Only its full-render request is blocked.
+    queueMicrotask(() => {
+      rangeInputEvent = false;
+      flushPendingStructuralRender();
+    });
   }, true);
 
   uiRoot.addEventListener('change', (event) => {
     const input = event.target;
     if (!(input instanceof HTMLInputElement) || input.type !== 'range') return;
-    updateRangeReadout(input);
+    rangeInputEvent = true;
     rangeDragging = false;
-    renderBlockedUntil = performance.now() + 280;
-    window.setTimeout(scheduleRender, 300);
+    updateRangeReadout(input);
+    queueMicrotask(() => {
+      rangeInputEvent = false;
+      flushPendingStructuralRender();
+    });
   }, true);
 
   window.addEventListener('pointerup', () => {
     if (!rangeDragging) return;
     rangeDragging = false;
-    renderBlockedUntil = performance.now() + 280;
-    window.setTimeout(scheduleRender, 300);
+    requestAnimationFrame(flushPendingStructuralRender);
   }, { passive: true });
 };
 
@@ -141,6 +166,7 @@ async function start(): Promise<void> {
     onReset: (replacement) => {
       state = normalizeState(replacement);
       (state as LegacySpeedState).speed = 1;
+      structureKey = '';
       saveState(state);
       scheduleRender();
     },
@@ -186,12 +212,16 @@ const loop = (now: number): void => {
     }
   }
 
-  renderAccumulator += deltaSeconds;
-  if (realtimeChanged && renderAccumulator >= 0.75) {
-    renderAccumulator = 0;
-    const active = document.activeElement as HTMLElement | null;
-    const editing = Boolean(active && uiRoot.contains(active) && (active.tagName === 'INPUT' || active.tagName === 'SELECT'));
-    if (!editing) scheduleRender();
+  liveAccumulator += deltaSeconds;
+  if (realtimeChanged && liveAccumulator >= 0.12) {
+    liveAccumulator = 0;
+    const nextStructureKey = realtimeStructureKey(state);
+    if (nextStructureKey !== structureKey) {
+      structureKey = nextStructureKey;
+      scheduleRender();
+    } else {
+      updateRealtimeUI(uiRoot, state);
+    }
   }
 
   saveAccumulator += deltaSeconds;
