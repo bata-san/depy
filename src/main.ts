@@ -1,6 +1,7 @@
 import './styles.css';
 import { createOfficeScene, type OfficeScene } from './office';
 import { openSaveScreen } from './save-screen';
+import { recoverStaffAfterWorkday } from './staff-life';
 import { advanceRealtime, advanceWeek, createInitialState, normalizeState, saveState } from './simulation';
 import type { GameState, PanelId } from './types';
 import { InterfaceController } from './interface/controller';
@@ -82,7 +83,21 @@ const gameTick = (): void => {
     projectProgress: projectProgress(),
     productGlow: activeProductGlow(),
     staffCount: Math.min(30, state.staff.length),
-    staff: state.staff.slice(0, 30).map((member) => ({ id: member.id, name: member.name, role: member.role, morale: member.morale, fatigue: member.fatigue })),
+    staff: state.staff.slice(0, 30).map((member) => ({
+      id: member.id,
+      name: member.name,
+      role: member.role,
+      specialty: member.specialty,
+      traits: member.traits,
+      level: member.level,
+      skill: member.skill,
+      creativity: member.creativity,
+      discipline: member.discipline,
+      growth: member.growth,
+      morale: member.morale,
+      fatigue: member.fatigue,
+      loyalty: member.loyalty,
+    })),
     officeLevel: state.officeLevel,
     researchActive: Boolean(state.activeResearch && !state.activeResearch.paused),
     cashHealth: Math.max(0, Math.min(1, state.cash / 80_000_000)),
@@ -149,7 +164,11 @@ async function start(): Promise<void> {
     onResetCamera: () => office.resetCamera(),
   });
 
-  office = createOfficeScene(canvasHost, hotspotHost, openPanel);
+  office = createOfficeScene(canvasHost, hotspotHost, openPanel, () => {
+    recoverStaffAfterWorkday(state);
+    ui.live(state);
+    saveState(state);
+  });
   lastTick = performance.now();
   gameTimer = window.setInterval(gameTick, 50);
   const resizeObserver = new ResizeObserver(() => office.resize());

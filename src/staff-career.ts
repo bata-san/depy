@@ -1,3 +1,4 @@
+import { staffArchetypeLabel, staffLifeProfile } from './staff-life';
 import { addLedger, addNotice, clamp } from './state';
 import type { GameState, StaffTrait } from './types';
 
@@ -6,6 +7,7 @@ const LEARNABLE_TRAITS: StaffTrait[] = ['meticulous', 'pragmatic', 'workhorse', 
 export function trainStaffEnhanced(state: GameState, staffId: string): { ok: boolean; message: string } {
   const member = state.staff.find((item) => item.id === staffId);
   if (!member) return { ok: false, message: '社員が見つかりません。' };
+  const before = staffLifeProfile(member);
   const cost = Math.round((520_000 + member.level * 220_000) / 10_000) * 10_000;
   if (state.cash < cost) return { ok: false, message: '研修費が不足しています。' };
 
@@ -31,12 +33,15 @@ export function trainStaffEnhanced(state: GameState, staffId: string): { ok: boo
       learned = ' 新しい特性も身につけました。';
     }
   }
-  return { ok: true, message: `${member.name}: 能力+${skillGain} / 発想+${creativeGain} / 規律+${disciplineGain}。${learned}`.trim() };
+  const after = staffLifeProfile(member);
+  const contributionGain = Math.max(0, Math.round(after.contribution - before.contribution));
+  return { ok: true, message: `${member.name}: 能力+${skillGain} / 発想+${creativeGain} / 規律+${disciplineGain} / 総合貢献+${contributionGain}。${learned}`.trim() };
 }
 
 export function updateStaffCareer(state: GameState): void {
   if (state.absoluteWeek <= 0 || state.absoluteWeek % 4 !== 0) return;
   const grown: string[] = [];
+  const promoted: string[] = [];
   for (const member of state.staff) {
     const threshold = 14 + member.level * 6;
     if (member.xp < threshold) continue;
@@ -53,7 +58,15 @@ export function updateStaffCareer(state: GameState): void {
       const trait = candidates[Math.floor(Math.random() * candidates.length)];
       if (trait) member.traits.push(trait);
     }
+
+    if ([3, 5, 8, 12].includes(member.level)) {
+      const raise = member.level >= 8 ? 1.055 : 1.035;
+      member.salary = Math.round(member.salary * raise / 10_000) * 10_000;
+      member.loyalty = clamp(member.loyalty + 5, 0, 100);
+      promoted.push(`${member.name} ${staffArchetypeLabel(staffLifeProfile(member).archetype)} Lv.${member.level}`);
+    }
     grown.push(`${member.name} Lv.${member.level}`);
   }
   if (grown.length) addNotice(state, '社員成長', `${grown.slice(0, 3).join(' / ')}${grown.length > 3 ? ` ほか${grown.length - 3}名` : ''}`, 'good');
+  if (promoted.length) addNotice(state, '昇格', `${promoted.slice(0, 2).join(' / ')}。能力の伸びに合わせて給与も更新されました。`, 'good');
 }

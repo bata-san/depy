@@ -4,15 +4,19 @@ import { AmbientAnimationSystem } from './ambient-animations';
 import { CameraController } from './camera-controller';
 import { cityBackdrop } from './city-backdrop';
 import { buildOfficeLayout } from './office-layout';
+import { buildOfficeLifeDetails } from './office-life-details';
+import { staffPresentAtHour, type StaffLifeInput } from './staff-life';
 import type { StaffVisualState } from './character-animations';
 import type { PanelId, StaffRole } from './types';
+
+export type OfficeStaffVisual = StaffVisualState & StaffLifeInput;
 
 export interface OfficeSnapshot {
   activePanel: PanelId;
   projectProgress: number;
   productGlow: number;
   staffCount: number;
-  staff: StaffVisualState[];
+  staff: OfficeStaffVisual[];
   officeLevel: number;
   researchActive: boolean;
   cashHealth: number;
@@ -52,20 +56,28 @@ const roleLines: Record<StaffRole, string[]> = {
 const tiredLines = ['ちょっと休憩したい…。', '集中が切れてきた。', '今日は長いな…。'];
 const lowMoraleLines = ['最近うまく噛み合わないな。', '一度立て直したい。', 'このままだと厳しいかも。'];
 const happyLines = ['いい流れ。次もいけそう。', '今のチーム、かなり噛み合ってる。', 'この結果はうれしい。'];
+const leavingLines = ['今日はここまで。', '続きは明日やろう。', 'お先に失礼します。', '最終チェックして帰ろう。'];
 
 const materialIntensity = (mesh: THREE.Mesh, value: number): void => {
   if (mesh.material instanceof THREE.MeshStandardMaterial) mesh.material.emissiveIntensity = value;
 };
 
-function lineFor(member: StaffVisualState, animation: string, epoch: number): string {
-  const pool = member.fatigue >= 82 ? tiredLines : member.morale <= 30 ? lowMoraleLines : member.morale >= 88 && animation === 'celebrating' ? happyLines : roleLines[member.role];
+function lineFor(member: StaffVisualState, animation: string, epoch: number, hour: number): string {
+  const pool = hour >= 17.5 ? leavingLines : member.fatigue >= 82 ? tiredLines : member.morale <= 30 ? lowMoraleLines : member.morale >= 88 && animation === 'celebrating' ? happyLines : roleLines[member.role];
   return pool[(epoch + member.name.length + member.id.length) % pool.length] ?? pool[0] ?? '';
+}
+
+function clockLabel(hour: number): string {
+  const whole = Math.floor(hour) % 24;
+  const minute = Math.floor((hour % 1) * 60);
+  return `${String(whole).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
 export function createOfficeScene(
   canvasHost: HTMLElement,
   overlay: HTMLElement,
   open: (panel: PanelId) => void,
+  onWorkdayEnded: () => void = () => undefined,
 ): OfficeScene {
   const scene = new THREE.Scene();
   const fog = new THREE.FogExp2(0x758a9a, .00235);
@@ -115,6 +127,7 @@ export function createOfficeScene(
   scene.add(localGlow);
 
   const layout = buildOfficeLayout(scene);
+  const officeDetails = buildOfficeLifeDetails(layout.office);
   const robotBeacon = layout.robot.getObjectByName('robot-beacon') as THREE.Mesh;
   const ambientAnimations = new AmbientAnimationSystem({
     deliveryRobot: layout.robot,
@@ -139,6 +152,16 @@ export function createOfficeScene(
     overlay.append(marker);
     return { id, object, marker };
   });
+
+  const officeClock = document.createElement('div');
+  officeClock.setAttribute('aria-hidden', 'true');
+  Object.assign(officeClock.style, {
+    position: 'absolute', left: '18px', bottom: '18px', zIndex: '5', pointerEvents: 'none',
+    padding: '7px 10px', borderRadius: '8px', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+    fontSize: '12px', letterSpacing: '.04em', color: '#eaf6ff', background: 'rgba(8,18,27,.72)',
+    border: '1px solid rgba(139,205,240,.26)', boxShadow: '0 8px 24px rgba(0,0,0,.22)', backdropFilter: 'blur(8px)',
+  });
+  overlay.append(officeClock);
 
   const speechMarkers: SpeechMarker[] = Array.from({ length: 4 }, () => {
     const root = document.createElement('div');
@@ -174,6 +197,8 @@ export function createOfficeScene(
     activePanel: 'home', projectProgress: 0, productGlow: .1, staffCount: 5, staff: [],
     officeLevel: 1, researchActive: false, cashHealth: .5, timeSpeed: 1,
   };
+  let visibleStaff: OfficeStaffVisual[] = [];
+  let visualHour = 8;
   let qualitySeconds = 0;
   let qualityFrames = 0;
   let hotspotSeconds = 0;
@@ -224,16 +249,16 @@ export function createOfficeScene(
   };
 
   const assignSpeech = (epoch: number): void => {
-    const available = Math.min(snapshot.staff.length, layout.people.length);
+    const available = Math.min(visibleStaff.length, layout.people.length);
     if (!available) { speechMarkers.forEach((marker) => { marker.staffIndex = -1; marker.root.style.opacity = '0'; }); return; }
     speechMarkers.forEach((marker, slot) => {
       const index = (epoch * 3 + slot * 7) % available;
-      const member = snapshot.staff[index];
+      const member = visibleStaff[index];
       const person = layout.people[index];
       if (!member || !person || !person.parent?.visible) { marker.staffIndex = -1; marker.root.style.opacity = '0'; return; }
       marker.staffIndex = index;
       marker.name.textContent = member.name;
-      marker.line.textContent = lineFor(member, String(person.userData.animation ?? ''), epoch + slot);
+      marker.line.textContent = lineFor(member, String(person.userData.animation ?? ''), epoch + slot, visualHour);
     });
   };
 
@@ -262,10 +287,27 @@ export function createOfficeScene(
     cameraController.update(delta);
     updateAdaptiveResolution(rawDelta);
 
+    let lighting = city.update(snapshot.timeSpeed === 0 ? 0 : delta);
+    visualHour = lighting.hour;
+    const staffPool = snapshot.staff.slice(0, Math.min(snapshot.staffCount, 30));
+    visibleStaff = staffPresentAtHour(staffPool, visualHour);
+    if (visualHour >= 17 && staffPool.length > 0 && visibleStaff.length === 0) {
+      onWorkdayEnded();
+      city.skipToMorning();
+      lighting = city.update(0);
+      visualHour = lighting.hour;
+      visibleStaff = staffPresentAtHour(staffPool, visualHour);
+      speechEpoch = -1;
+    }
+
+    const workdayState = visualHour < 10 ? '出社中' : visualHour < 17 ? '勤務中' : '退勤中';
+    officeClock.textContent = `${clockLabel(visualHour)} · ${workdayState} ${visibleStaff.length}/${staffPool.length}`;
+    officeClock.style.opacity = snapshot.activePanel === 'home' ? '1' : '.35';
+
     layout.expansionGroups.forEach((group, index) => { group.visible = snapshot.officeLevel >= index + 2; });
     layout.characterAnimations.update(time, {
-      staffCount: snapshot.staffCount,
-      staff: snapshot.staff,
+      staffCount: visibleStaff.length,
+      staff: visibleStaff,
       projectActive: snapshot.projectProgress > 0 && snapshot.projectProgress < 100,
       researchActive: snapshot.researchActive,
       productActive: snapshot.productGlow > .16,
@@ -278,8 +320,17 @@ export function createOfficeScene(
       researchActive: snapshot.researchActive,
       cashHealth: snapshot.cashHealth,
     });
+    officeDetails.update(time, {
+      officeLevel: snapshot.officeLevel,
+      presentStaff: visibleStaff.length,
+      totalStaff: staffPool.length,
+      night: lighting.night,
+      projectProgress: snapshot.projectProgress,
+      productGlow: snapshot.productGlow,
+      researchActive: snapshot.researchActive,
+      cashHealth: snapshot.cashHealth,
+    });
 
-    const lighting = city.update(delta);
     hemisphere.color.copy(lighting.hemisphereSky);
     hemisphere.groundColor.copy(lighting.hemisphereGround);
     hemisphere.intensity = .42 + lighting.daylight * 1.35 + lighting.night * .18;
@@ -302,7 +353,7 @@ export function createOfficeScene(
     if (researchScreen) materialIntensity(researchScreen, snapshot.researchActive ? 1.9 + Math.sin(time * 3) * .32 : .68);
     if (waferScreen) materialIntensity(waferScreen, snapshot.researchActive ? 1.6 + Math.sin(time * 4.2) * .28 : .58);
     serverLights.forEach((light, index) => materialIntensity(light, .48 + Math.max(0, Math.sin(time * (2.1 + index % 3) + index)) * .95));
-    localGlow.intensity = 12 + lighting.night * 9 + snapshot.projectProgress * .08 + snapshot.productGlow * 5;
+    localGlow.intensity = 9 + lighting.night * (visibleStaff.length ? 13 : 4) + snapshot.projectProgress * .08 + snapshot.productGlow * 5;
 
     hotspotSeconds += rawDelta;
     if (hotspotSeconds >= .12) { hotspotSeconds = 0; updateHotspots(); }
@@ -325,6 +376,7 @@ export function createOfficeScene(
       renderer.domElement.remove();
       hotspots.forEach((hotspot) => hotspot.marker.remove());
       speechMarkers.forEach((marker) => marker.root.remove());
+      officeClock.remove();
     },
   };
 }

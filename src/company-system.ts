@@ -1,5 +1,6 @@
 import { FACILITY_DEFINITIONS, generateCandidate } from './data';
 import { createLoan, loanOffers, type LoanAmount } from './loan-system';
+import { staffWeeklyConditionDelta, teamChemistry } from './staff-life';
 import { addLedger, addNotice, clamp, uid } from './state';
 import type { FacilityId, GameState, Loan, StaffMember } from './types';
 
@@ -21,7 +22,9 @@ export function hireCandidate(state: GameState, candidateId: string): { ok: bool
   if (state.cash < candidate.signingBonus) return { ok: false, message: '契約金が不足しています。' };
   state.cash -= candidate.signingBonus; addLedger(state, `${candidate.name} 採用`, -candidate.signingBonus, 'salary');
   const member: StaffMember = { ...candidate }; delete (member as Partial<typeof candidate>).signingBonus; delete (member as Partial<typeof candidate>).expiresAtWeek;
-  state.staff.push(member); state.candidates = state.candidates.filter((item) => item.id !== candidateId); return { ok: true, message: `${candidate.name}を採用しました。` };
+  state.staff.push(member); state.candidates = state.candidates.filter((item) => item.id !== candidateId);
+  addNotice(state, '新入社員', `${candidate.name}がチームに加わりました。オフィス内にも本人が登場します。`, 'good');
+  return { ok: true, message: `${candidate.name}を採用しました。` };
 }
 export function trainStaff(state: GameState, staffId: string): { ok: boolean; message: string } {
   const member = state.staff.find((item) => item.id === staffId); if (!member) return { ok: false, message: '社員が見つかりません。' };
@@ -45,7 +48,7 @@ export function upgradeFacility(state: GameState, facilityId: FacilityId): { ok:
   const multiplier = facilityId === 'office' ? 1.58 : 1.72;
   const cost = Math.round(definition.baseUpgrade * Math.pow(multiplier, facility.level)); if (state.cash < cost) return { ok: false, message: `設備投資費 ¥${cost.toLocaleString()}が不足しています。` };
   state.cash -= cost; addLedger(state, `${definition.name} Lv.${facility.level + 1}`, -cost, 'facility'); facility.level += 1;
-  if (facilityId === 'office') { state.officeLevel = facility.level; addNotice(state, 'オフィス拡張', `本社をLv.${facility.level}へ拡張。社員定員は${staffCapacity(state)}名になりました。`, 'good'); }
+  if (facilityId === 'office') { state.officeLevel = facility.level; addNotice(state, 'オフィス拡張', `本社をLv.${facility.level}へ拡張。社員定員は${staffCapacity(state)}名になり、3D空間にも新しい区画と装飾が増えました。`, 'good'); }
   return { ok: true, message: `${definition.name}を強化しました。` };
 }
 
@@ -73,14 +76,30 @@ export function updateCompanyWeekly(state: GameState): void {
   const activeProjects = state.projects.filter((project) => project.stage !== 'ready' && !project.paused).length;
   const activeLines = state.contracts.filter((contract) => contract.active).length;
   const sellingProducts = state.products.filter((product) => product.status === 'selling').length;
+  const chemistry = teamChemistry(state);
   for (const member of state.staff) {
     const roleLoad = member.role === 'operations' ? activeLines * .35 : member.role === 'marketing' ? sellingProducts * .3 : ['architect', 'circuit', 'thermal', 'software', 'validation'].includes(member.role) ? activeProjects * .28 : 0;
     const working = roleLoad > 0 || Boolean(state.activeResearch && !state.activeResearch.paused);
-    member.fatigue = clamp(member.fatigue + (working ? 1.15 + roleLoad : -3), 0, 100);
-    member.morale = clamp(member.morale + (state.cash < 0 ? -3.5 : member.fatigue > 82 ? -2 : member.fatigue < 35 ? .3 : 0), 0, 100);
-    member.loyalty = clamp(member.loyalty + (member.morale < 35 ? -1 : member.morale > 80 ? .1 : 0), 0, 100);
-    member.xp += working ? 2.2 : .25;
+    const condition = staffWeeklyConditionDelta(member, working ? 1 + roleLoad : 0, chemistry);
+    member.fatigue = clamp(member.fatigue + condition.fatigue, 0, 100);
+
+    const financeMood = state.cash < -25_000_000 ? -.42 : state.cash < 0 ? -.16 : 0;
+    const exhaustionMood = member.fatigue > 90 ? -.32 : member.fatigue > 80 ? -.12 : member.fatigue < 38 ? .08 : 0;
+    member.morale = clamp(member.morale + condition.morale + financeMood + exhaustionMood, 0, 100);
+
+    const loyaltyTarget = clamp(
+      42 + member.morale * .42 + chemistry * .12 + (member.traits.includes('loyal') ? 18 : 0) - (member.traits.includes('temperamental') ? 7 : 0),
+      32,
+      96,
+    );
+    let loyaltyDelta = (loyaltyTarget - member.loyalty) * .018;
+    if (member.loyalty <= 8) loyaltyDelta = Math.max(loyaltyDelta, 1.1);
+    else if (member.loyalty <= 24) loyaltyDelta = Math.max(loyaltyDelta, .42);
+    if (state.cash < -25_000_000) loyaltyDelta -= .12;
+    member.loyalty = clamp(member.loyalty + clamp(loyaltyDelta, -.38, 1.2), 0, 100);
+    member.xp += condition.xp;
   }
+  if (state.absoluteWeek > 0 && state.absoluteWeek % 24 === 0 && chemistry >= 78) addNotice(state, 'チーム好調', `チーム相性 ${Math.round(chemistry)}。部門間の連携が高い状態を維持しています。`, 'good');
   if (state.absoluteWeek - state.lastCandidateRefreshWeek >= 12) { state.candidates = Array.from({ length: 5 }, () => generateCandidate(state.absoluteWeek, state.date.year)); state.lastCandidateRefreshWeek = state.absoluteWeek; }
   if (state.cash < 0) { state.reputation = clamp(state.reputation - .3, 0, 100); if (state.cash < -25_000_000) addNotice(state, '資金危機', '債務超過が深刻です。融資、値上げ、契約縮小が必要です。', 'bad'); }
 }

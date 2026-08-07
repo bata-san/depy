@@ -2,7 +2,10 @@ import * as THREE from 'three';
 import { box, material, sphere } from './office-primitives';
 import { cityWindowTexture } from './voxel-textures';
 
-const VISUAL_DAY_SECONDS = 12 * 60;
+// One complete visual day is intentionally short. The office skips the empty late night,
+// so players see a new morning roughly every two minutes of normal play.
+const VISUAL_DAY_SECONDS = 3 * 60;
+const VISUAL_MORNING_HOUR = 7.5;
 const CITY_GROUND_Y = -84;
 const blendA = new THREE.Color();
 const blendB = new THREE.Color();
@@ -17,10 +20,14 @@ export interface CityLightingSample {
   fogColor: THREE.Color;
   windowFill: THREE.Color;
   exposure: number;
+  phase: number;
+  hour: number;
+  minute: number;
 }
 
 export interface CityBackdropController {
   update: (delta: number) => CityLightingSample;
+  skipToMorning: () => void;
 }
 
 interface BuildingSpec {
@@ -180,7 +187,8 @@ export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
   horizonGlow.position.set(0, 28, -390);
   city.add(horizonGlow);
 
-  let elapsed = VISUAL_DAY_SECONDS * .04;
+  const morningPhase = (VISUAL_MORNING_HOUR - 6) / 24;
+  let elapsed = VISUAL_DAY_SECONDS * morningPhase;
   const top = new THREE.Color();
   const upper = new THREE.Color();
   const horizon = new THREE.Color();
@@ -199,6 +207,9 @@ export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
     fogColor,
     windowFill,
     exposure: 1,
+    phase: morningPhase,
+    hour: VISUAL_MORNING_HOUR,
+    minute: 30,
   };
 
   const update = (delta: number): CityLightingSample => {
@@ -208,6 +219,7 @@ export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
     const daylight = smooth(-.18, .2, solar);
     const night = 1 - daylight;
     const twilight = 1 - Math.min(1, Math.abs(solar) * 2.4);
+    const hour = (6 + phase * 24) % 24;
 
     phaseColor(phase, 0x5a8fc5, 0x57a9e4, 0xc95f58, 0x061124, top);
     phaseColor(phase, 0xe5a86f, 0x9ed1ef, 0xf09a6b, 0x10233c, upper);
@@ -235,8 +247,15 @@ export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
     sample.night = night;
     sample.sunIntensity = .35 + daylight * 3.15 + twilight * .7;
     sample.exposure = .88 + daylight * .28 + twilight * .08;
+    sample.phase = phase;
+    sample.hour = hour;
+    sample.minute = Math.floor((hour % 1) * 60);
     return sample;
   };
 
-  return { update };
+  const skipToMorning = (): void => {
+    elapsed = VISUAL_DAY_SECONDS * morningPhase;
+  };
+
+  return { update, skipToMorning };
 }

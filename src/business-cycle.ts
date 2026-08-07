@@ -3,6 +3,7 @@ import { updateCompanyWeekly } from './company-system';
 import { activeCompetitorModels, updateCompetitorsWeekly } from './competitor-system';
 import { factoryOutputForProduct, updateFactoryLineOperations } from './factory-operations';
 import { updateContractsWeekly } from './manufacturing-system';
+import { rewardStaffSuccess } from './staff-life';
 import { salesStaffEffect } from './staff-effects';
 import { addLedger, addNotice, clamp, dateToIndex, saveState } from './state';
 import type { CompetitorModel, GameState, ReleasedProduct } from './types';
@@ -160,6 +161,12 @@ function updateSales(state: GameState): { sold: number; revenue: number; structu
     updateReasons(product, produced, rivalPressure, pricing.ratio);
     product.history.unshift({ week: state.absoluteWeek, demand, produced, sold, lostSales: lost, inventory: product.inventory, revenue, profit, rating: product.rating, marketShare: product.marketShare });
     product.history = product.history.slice(0, 52);
+
+    if (product.businessAgeWeeks === 1 && profit > 0 && product.rating >= 7) {
+      const moraleBoost = product.rating >= 8.4 ? 8 : product.rating >= 7.6 ? 5.5 : 3.5;
+      rewardStaffSuccess(state, moraleBoost, undefined, product.rating >= 8 ? 2 : 1);
+      addNotice(state, product.rating >= 8.4 ? '大ヒットの手応え' : '好調な船出', `${product.name}が初週から黒字・評価${product.rating.toFixed(1)}を記録。成功体験で全社の士気が上がりました。`, 'good');
+    }
 
     state.stats.lifetimeUnits += sold;
     state.reputation = clamp(state.reputation + sold / 22_000 + (product.rating - 6.5) * .009, 0, 100);
