@@ -126,14 +126,22 @@ export function buildOfficeLayout(scene: THREE.Scene) {
 
   const staffColors = [0x5aa7ff,0xff8d71,0x79d69c,0xc998ff,0xffc56f,0x62cbd3,0xf178a7,0x95c76f,0x7398e8,0xe89f73,0x70d1b6,0xb286e8,0x5ab8e8,0xe8c45a,0x8ac976,0xe57d9f,0x8b96e7,0x5fd0c4,0xd58ce6,0xe59a66,0x6eb6ef,0x81cd89,0xecbd67,0xc688e7,0x68cbc0,0xeb8a85,0x79a4e8,0xa6cb68,0xda8fc5,0x71c8e0];
   const basePositions: Array<[number, number, number]> = [
-    [-6.1,-3.05,Math.PI],[-3.35,-3.05,Math.PI],[-6.1,-2.3,0],[-3.35,-2.3,0],[-.65,-3.05,Math.PI],[-.65,-2.3,0],
-    [5.15,-3.05,Math.PI],[2.4,-3.05,Math.PI],[-5.15,2.75,0],[.2,2.5,0],[5,2.55,0],[6.3,-.2,Math.PI/2],
+    [-6.1,-3.05,Math.PI],[-3.35,-3.05,Math.PI],[-6.1,-2.3,0],[-3.35,-2.3,0],[-.65,-3.05,Math.PI],
+    [5.15,-3.05,Math.PI],[2.4,-3.05,Math.PI],[-5.15,2.75,0],[.2,2.5,0],[5,2.55,0],
   ];
-  const eastPositions: Array<[number, number, number]> = [[10.8,-3.0,Math.PI],[14,-3.0,Math.PI],[10.8,.25,0],[14,.25,0],[10.8,4.15,Math.PI],[14,4.15,Math.PI]];
-  const westPositions: Array<[number, number, number]> = [[-10.8,-3,Math.PI],[-14,-3,Math.PI],[-10.8,.25,0],[-14,.25,0],[-12,2.2,0],[-15.2,2.25,0]];
-  const northPositions: Array<[number, number, number]> = [[-7,11.6,Math.PI],[-3.6,11.6,Math.PI],[3.6,11.6,Math.PI],[7,11.6,Math.PI],[-7,12.7,0],[-3.6,12.7,0],[3.6,12.7,0],[7,12.7,0]];
-  const executivePositions: Array<[number, number, number]> = [[-2.4,20.7,0],[.4,20.7,0],[4.3,20.7,0],[0,23.3,Math.PI]];
-  const allPositions = [...basePositions, ...eastPositions, ...westPositions, ...northPositions, ...executivePositions].slice(0, 30);
+  const eastPositions: Array<[number, number, number]> = [
+    [10.8,-3.0,Math.PI],[14,-3.0,Math.PI],[10.8,.25,0],[14,.25,0],[10.8,4.15,Math.PI],
+  ];
+  const westPositions: Array<[number, number, number]> = [
+    [-10.8,-3,Math.PI],[-14,-3,Math.PI],[-10.8,.25,0],[-14,.25,0],[-12,2.2,0],
+  ];
+  const northPositions: Array<[number, number, number]> = [
+    [-7,11.6,Math.PI],[-3.6,11.6,Math.PI],[3.6,11.6,Math.PI],[7,11.6,Math.PI],[0,15.0,Math.PI],
+  ];
+  const executivePositions: Array<[number, number, number]> = [
+    [-2.4,20.7,0],[.4,20.7,0],[4.3,20.7,0],[-.6,23.3,Math.PI],[2.2,23.3,Math.PI],
+  ];
+  const allPositions = [...basePositions, ...eastPositions, ...westPositions, ...northPositions, ...executivePositions];
   const people = allPositions.map(([x, z, rotation], index) => premiumStaffPerson(staffColors[index % staffColors.length] ?? 0x6dafff, x, z, rotation, index));
   people.forEach((person, index) => {
     if (index < basePositions.length) office.add(person);
