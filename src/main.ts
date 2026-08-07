@@ -1,6 +1,7 @@
 import './styles.css';
 import { createOfficeScene, type OfficeScene } from './office';
 import { openSaveScreen } from './save-screen';
+import { recoverStaffAfterWorkday } from './staff-life';
 import { advanceRealtime, advanceWeek, createInitialState, normalizeState, saveState } from './simulation';
 import type { GameState, PanelId } from './types';
 import { InterfaceController } from './interface/controller';
@@ -163,7 +164,11 @@ async function start(): Promise<void> {
     onResetCamera: () => office.resetCamera(),
   });
 
-  office = createOfficeScene(canvasHost, hotspotHost, openPanel);
+  office = createOfficeScene(canvasHost, hotspotHost, openPanel, () => {
+    recoverStaffAfterWorkday(state);
+    ui.live(state);
+    saveState(state);
+  });
   lastTick = performance.now();
   gameTimer = window.setInterval(gameTick, 50);
   const resizeObserver = new ResizeObserver(() => office.resize());
