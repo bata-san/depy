@@ -1,13 +1,14 @@
 import { ROLE_LABELS, SPECIALTY_LABELS, TRAIT_LABELS } from './data';
 import { businessDateLabel } from './business-cycle';
 import { operationsStaffEffect, projectStaffEffect, researchStaffEffect, salesStaffEffect } from './staff-effects';
-import type { GameState, ProjectStage } from './types';
+import { addLedger, addNotice, clamp, saveState } from './state';
+import type { DevelopmentProject, GameState, ProjectStage, StaffMember, StaffRole } from './types';
 import { esc } from './ui-format';
 
 const stages: Record<ProjectStage, string> = {
   concept: '企画', architecture: '詳細設計', tapeout: 'テープアウト', prototype: '試作', validation: '検証', ready: '完成',
 };
-
+const staffRoles = Object.keys(ROLE_LABELS) as StaffRole[];
 const yen = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY', maximumFractionDigits: 0 });
 
 const setText = (element: Element | null, value: string): void => {
@@ -62,6 +63,42 @@ function updateHud(root: HTMLElement, state: GameState): void {
   }
 }
 
+function staffOptionText(member: StaffMember): string {
+  return `${member.name} · ${ROLE_LABELS[member.role]} · ${SPECIALTY_LABELS[member.specialty]} · 能力${Math.round(member.skill)}`;
+}
+
+function ensureProjectLeadControl(card: HTMLElement, state: GameState, project: DevelopmentProject): void {
+  let control = card.querySelector<HTMLElement>('.project-lead-live');
+  let select = control?.querySelector<HTMLSelectElement>('select');
+  if (!control || !select) {
+    control = document.createElement('label');
+    control.className = 'project-lead-live';
+    const caption = document.createElement('span');
+    caption.textContent = '開発責任者';
+    select = document.createElement('select');
+    control.append(caption, select);
+    const impact = card.querySelector('.staff-impact-live');
+    if (impact) impact.before(control); else card.append(control);
+    select.addEventListener('change', () => {
+      const next = select?.value ?? '';
+      const liveProject = state.projects.find((item) => item.id === project.id);
+      if (!liveProject || !next) return;
+      liveProject.leadStaffId = next;
+      const member = state.staff.find((item) => item.id === next);
+      addNotice(state, '責任者変更', `${liveProject.codeName}の責任者を${member?.name ?? '社員'}へ変更しました。`, 'info');
+      saveState(state);
+    });
+  }
+  const staffKey = state.staff.map((member) => `${member.id}:${member.role}:${Math.round(member.skill)}`).join('|');
+  if (select.dataset.staffKey !== staffKey) {
+    select.dataset.staffKey = staffKey;
+    select.innerHTML = state.staff.map((member) => `<option value="${member.id}">${esc(staffOptionText(member))}</option>`).join('');
+  }
+  const fallback = state.staff[0]?.id ?? '';
+  const wanted = project.leadStaffId ?? fallback;
+  if (select.value !== wanted) select.value = wanted;
+}
+
 function updateProjects(root: HTMLElement, state: GameState): void {
   const cards = root.querySelectorAll<HTMLElement>('.project-card');
   cards.forEach((card, index) => {
@@ -73,6 +110,7 @@ function updateProjects(root: HTMLElement, state: GameState): void {
     if (project.stage === 'ready') return;
     const effect = projectStaffEffect(state, project);
     const line = ensureLiveLine(card, 'staff-impact-live');
+    ensureProjectLeadControl(card, state, project);
     const weak = effect.weakRole ? ` · 不足 ${ROLE_LABELS[effect.weakRole]}` : '';
     const quality = effect.quality >= 82 ? '最高' : effect.quality >= 68 ? '良好' : effect.quality >= 54 ? '不安' : '危険';
     setText(line, `TEAM ×${effect.speed.toFixed(2)} · ${effect.leadName} · 適性${Math.round(effect.coverage * 100)}% · 品質 ${quality}${weak}`);
@@ -152,12 +190,51 @@ function updateFactories(root: HTMLElement, state: GameState): void {
   });
 }
 
+function ensureRoleControl(card: HTMLElement, state: GameState, member: StaffMember): void {
+  let control = card.querySelector<HTMLElement>('.staff-role-live');
+  let select = control?.querySelector<HTMLSelectElement>('select');
+  if (!control || !select) {
+    control = document.createElement('label');
+    control.className = 'staff-role-live';
+    const caption = document.createElement('span');
+    caption.textContent = '職種変更';
+    select = document.createElement('select');
+    select.innerHTML = staffRoles.map((role) => `<option value="${role}">${esc(ROLE_LABELS[role])}</option>`).join('');
+    control.append(caption, select);
+    const footer = card.querySelector('footer');
+    if (footer) footer.before(control); else card.append(control);
+    select.addEventListener('change', () => {
+      const liveMember = state.staff.find((item) => item.id === member.id);
+      const nextRole = select?.value as StaffRole | undefined;
+      if (!liveMember || !nextRole || nextRole === liveMember.role) return;
+      const previousRole = liveMember.role;
+      const cost = Math.round((900_000 + liveMember.level * 180_000) / 10_000) * 10_000;
+      if (state.cash < cost) {
+        select.value = previousRole;
+        addNotice(state, '職種変更できません', `${liveMember.name}の転向には${yen.format(cost)}必要です。`, 'warning');
+        return;
+      }
+      state.cash -= cost;
+      addLedger(state, `${liveMember.name} 職種変更`, -cost, 'salary');
+      liveMember.role = nextRole;
+      liveMember.fatigue = clamp(liveMember.fatigue + 8, 0, 100);
+      liveMember.morale = clamp(liveMember.morale - 3, 0, 100);
+      addNotice(state, '職種変更', `${liveMember.name}: ${ROLE_LABELS[previousRole]} → ${ROLE_LABELS[nextRole]}`, 'info');
+      saveState(state);
+    });
+  }
+  if (select.value !== member.role) select.value = member.role;
+}
+
 function updateStaff(root: HTMLElement, state: GameState): void {
   const cards = root.querySelectorAll<HTMLElement>('.staff-grid > .staff-card');
   cards.forEach((card, index) => {
     const member = state.staff[index];
     if (!member) return;
+    ensureRoleControl(card, state, member);
     setText(card.querySelector('header p'), `${SPECIALTY_LABELS[member.specialty]} · Lv.${member.level}`);
+    const roleBadge = card.querySelector<HTMLElement>('header .badge');
+    if (roleBadge) setText(roleBadge, ROLE_LABELS[member.role]);
     const core = card.querySelectorAll<HTMLElement>('.staff-core-stats span b');
     setText(core[0] ?? null, String(Math.round(member.skill)));
     setText(core[1] ?? null, String(Math.round(member.creativity)));
