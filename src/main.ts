@@ -5,15 +5,18 @@ import { advanceRealtime, advanceWeek, createInitialState, normalizeState, saveS
 import type { GameState, PanelId } from './types';
 import { InterfaceController } from './interface/controller';
 
-const app = document.querySelector<HTMLElement>('#app');
-if (!app) throw new Error('#app was not found');
+function requireElement<T extends Element>(selector: string): T {
+  const element = document.querySelector<T>(selector);
+  if (!element) throw new Error(`${selector} was not found`);
+  return element;
+}
 
+const app = requireElement<HTMLElement>('#app');
 app.innerHTML = `<main class="app-shell" aria-label="PC Frontier Lab"><div id="office-canvas" class="office-canvas" aria-hidden="true"></div><div id="office-hotspots" class="office-hotspots"></div><div id="ui-root"></div></main>`;
 
-const uiRoot = document.querySelector<HTMLElement>('#ui-root');
-const canvasHost = document.querySelector<HTMLElement>('#office-canvas');
-const hotspotHost = document.querySelector<HTMLElement>('#office-hotspots');
-if (!uiRoot || !canvasHost || !hotspotHost) throw new Error('Application hosts were not created');
+const uiRoot = requireElement<HTMLElement>('#ui-root');
+const canvasHost = requireElement<HTMLElement>('#office-canvas');
+const hotspotHost = requireElement<HTMLElement>('#office-hotspots');
 
 let state: GameState;
 let office: OfficeScene;
