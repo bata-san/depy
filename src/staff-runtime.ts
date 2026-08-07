@@ -47,7 +47,9 @@ function projectPair(state: GameState, project: DevelopmentProject): { lead?: St
   if (!lead) return { synergy: 50 };
   const partners = state.staff.filter((member) => member.id !== lead.id);
   const partner = partners.sort((a, b) => staffPairSynergy(lead, b) - staffPairSynergy(lead, a))[0];
-  return { lead, partner, synergy: partner ? staffPairSynergy(lead, partner) : 50 };
+  return partner
+    ? { lead, partner, synergy: staffPairSynergy(lead, partner) }
+    : { lead, synergy: 50 };
 }
 
 function applyStageCraft(state: GameState, project: DevelopmentProject, stage: ProjectStage, quality: number, leadName: string, synergy: number): void {
