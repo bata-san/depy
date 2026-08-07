@@ -4,7 +4,19 @@ import { staffWeeklyConditionDelta, teamChemistry } from './staff-life';
 import { addLedger, addNotice, clamp, uid } from './state';
 import type { FacilityId, GameState, Loan, StaffMember } from './types';
 
+const FOUNDING_SUPPORT_WEEKS = 72;
+const FOUNDING_FIXED_COST_RATE = .45;
+
 export { loanOffers };
+
+export function foundingSupportActive(state: GameState): boolean {
+  return state.stats.productsLaunched === 0 && state.absoluteWeek < FOUNDING_SUPPORT_WEEKS;
+}
+
+function foundingCostRate(state: GameState): number {
+  return foundingSupportActive(state) ? FOUNDING_FIXED_COST_RATE : 1;
+}
+
 export function takeLoan(state: GameState, amount: LoanAmount): { ok: boolean; message: string; loan?: Loan } {
   const loan = createLoan(state, amount, uid('loan'));
   if (!loan) return { ok: false, message: '現在の信用状態ではこの融資を利用できません。' };
@@ -58,18 +70,25 @@ export function recurringWeeklyBurn(state: GameState): number {
   const factoryAdmin = state.contracts.filter((contract) => contract.active).length * 85_000;
   const office = 520_000 + state.officeLevel * 190_000 + Math.max(0, state.staff.length - 5) * 28_000;
   const legal = Math.max(210_000, state.series.length * 100_000 + state.products.length * 82_000);
+  const fixedCosts = (salaries + facilities + factoryAdmin + office + legal) * foundingCostRate(state);
   const research = state.activeResearch && !state.activeResearch.paused ? state.activeResearch.weeklyCost : 0;
   const projects = state.projects.filter((project) => project.stage !== 'ready' && !project.paused).reduce((sum, project) => sum + project.weeklyBurn, 0);
-  return salaries + facilities + factoryAdmin + office + legal + research + projects + state.loans.reduce((sum, loan) => sum + loan.weeklyPayment, 0);
+  return fixedCosts + research + projects + state.loans.reduce((sum, loan) => sum + loan.weeklyPayment, 0);
 }
 export function runwayWeeks(state: GameState): number { const burn = recurringWeeklyBurn(state); return burn <= 0 ? 999 : Math.max(0, state.cash / burn); }
 
 export function updateCompanyWeekly(state: GameState): void {
-  const salaries = Math.round(state.staff.reduce((sum, member) => sum + member.salary / 4, 0));
-  const facilities = Math.round(state.facilities.reduce((sum, facility) => sum + FACILITY_DEFINITIONS[facility.id].weeklyMaintenance * facility.level, 0));
+  const rawSalaries = Math.round(state.staff.reduce((sum, member) => sum + member.salary / 4, 0));
+  const rawFacilities = Math.round(state.facilities.reduce((sum, facility) => sum + FACILITY_DEFINITIONS[facility.id].weeklyMaintenance * facility.level, 0));
   const factoryAdmin = state.contracts.filter((contract) => contract.active).length * 85_000;
-  const overhead = 520_000 + state.officeLevel * 190_000 + Math.max(0, state.staff.length - 5) * 28_000 + state.series.length * 100_000 + state.products.length * 82_000 + factoryAdmin;
-  state.cash -= salaries + facilities + overhead; addLedger(state, '給与', -salaries, 'salary'); addLedger(state, '設備・管理費', -(facilities + overhead), 'overhead');
+  const rawOverhead = 520_000 + state.officeLevel * 190_000 + Math.max(0, state.staff.length - 5) * 28_000 + state.series.length * 100_000 + state.products.length * 82_000 + factoryAdmin;
+  const rate = foundingCostRate(state);
+  const salaries = Math.round(rawSalaries * rate);
+  const facilities = Math.round(rawFacilities * rate);
+  const overhead = Math.round(rawOverhead * rate);
+  state.cash -= salaries + facilities + overhead;
+  addLedger(state, rate < 1 ? '給与（創業支援）' : '給与', -salaries, 'salary');
+  addLedger(state, rate < 1 ? '設備・管理費（創業支援）' : '設備・管理費', -(facilities + overhead), 'overhead');
   if (state.activeResearch && !state.activeResearch.paused) { state.cash -= state.activeResearch.weeklyCost; state.activeResearch.spent += state.activeResearch.weeklyCost; addLedger(state, '研究運営費', -state.activeResearch.weeklyCost, 'research'); }
   for (const project of state.projects.filter((item) => item.stage !== 'ready' && !item.paused)) { state.cash -= project.weeklyBurn; project.spent += project.weeklyBurn; addLedger(state, `${project.codeName} 開発運営`, -project.weeklyBurn, 'development'); if (state.cash < 0) project.paused = true; }
   for (const loan of [...state.loans]) { const payment = Math.min(loan.weeklyPayment, loan.balance); state.cash -= payment; loan.balance -= payment; loan.remainingWeeks -= 1; addLedger(state, `${loan.lender} 返済`, -payment, 'loan'); if (loan.balance <= 1 || loan.remainingWeeks <= 0) state.loans = state.loans.filter((item) => item.id !== loan.id); }
@@ -99,6 +118,7 @@ export function updateCompanyWeekly(state: GameState): void {
     member.loyalty = clamp(member.loyalty + clamp(loyaltyDelta, -.38, 1.2), 0, 100);
     member.xp += condition.xp;
   }
+  if (state.absoluteWeek === FOUNDING_SUPPORT_WEEKS && state.stats.productsLaunched === 0) addNotice(state, '創業支援終了', '創業72週の固定費補助が終了しました。製品発売か資金調達を急いでください。', 'warning');
   if (state.absoluteWeek > 0 && state.absoluteWeek % 24 === 0 && chemistry >= 78) addNotice(state, 'チーム好調', `チーム相性 ${Math.round(chemistry)}。部門間の連携が高い状態を維持しています。`, 'good');
   if (state.absoluteWeek - state.lastCandidateRefreshWeek >= 12) { state.candidates = Array.from({ length: 5 }, () => generateCandidate(state.absoluteWeek, state.date.year)); state.lastCandidateRefreshWeek = state.absoluteWeek; }
   if (state.cash < 0) { state.reputation = clamp(state.reputation - .3, 0, 100); if (state.cash < -25_000_000) addNotice(state, '資金危機', '債務超過が深刻です。融資、値上げ、契約縮小が必要です。', 'bad'); }
