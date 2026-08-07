@@ -20,21 +20,56 @@ function launchModel(state: GameState, company: CompetitorCompany): void {
   const category = company.specialties[(state.absoluteWeek + company.models.length) % company.specialties.length] ?? 'cpu';
   const yearDelta = state.date.year - 2015;
   const strategy = company.strategy;
-  const performance = 78 + yearDelta * 9.2 + company.technology * .62 + (strategy === 'performance' ? 13 : strategy === 'efficient' ? -3 : 0) + Math.random() * 10;
-  const price = Math.round((category === 'cpu' ? 32_000 : 48_000) * (1 + yearDelta * .065) * (strategy === 'value' ? .78 : strategy === 'performance' ? 1.34 : 1) / 1000) * 1000;
+  const performance = 70 + yearDelta * 8.2 + company.technology * .56 + (strategy === 'performance' ? 11 : strategy === 'efficient' ? -3 : 0) + Math.random() * 9;
+  const price = Math.round((category === 'cpu' ? 32_000 : 48_000) * (1 + yearDelta * .06) * (strategy === 'value' ? .78 : strategy === 'performance' ? 1.3 : 1) / 1000) * 1000;
   const model: CompetitorModel = {
     id: uid('rival'), companyId: company.id, name: modelName(company, category, state.date.year), category,
     launchDate: { ...state.date }, endDate: { year: state.date.year + 1, week: Math.max(1, state.date.week - 1) },
-    price, performance, efficiency: 58 + company.technology * .55 + Math.random() * 12,
-    reliability: clamp(70 + company.brand * .15 + Math.random() * 12, 55, 98),
-    software: clamp(66 + company.technology * .5 + Math.random() * 12, 45, 98), brand: company.brand,
-    fictional: true, salesMomentum: .85 + Math.random() * .35, marketShare: 0,
+    price, performance, efficiency: 54 + company.technology * .5 + Math.random() * 11,
+    reliability: clamp(66 + company.brand * .14 + Math.random() * 11, 52, 96),
+    software: clamp(62 + company.technology * .45 + Math.random() * 11, 42, 96), brand: company.brand,
+    fictional: true, salesMomentum: .78 + Math.random() * .32, marketShare: 0,
   };
   company.models.push(model);
   company.cash -= price * 120;
-  company.nextLaunchWeek = state.absoluteWeek + 28 + Math.floor(Math.random() * 28);
+  company.nextLaunchWeek = state.absoluteWeek + 32 + Math.floor(Math.random() * 34);
   company.history.unshift(`${state.date.year}年: ${model.name}を投入`);
   addNotice(state, '競合新製品', `${company.name}が${model.name}を発売しました。`, 'warning');
+}
+
+function latestPerformance(company: CompetitorCompany, category: ProductCategory): number {
+  return company.models.filter((model) => model.category === category).reduce((best, model) => Math.max(best, model.performance), category === 'gpu' ? 180 : 150);
+}
+
+function launchFutureRealModel(state: GameState, company: CompetitorCompany, category: ProductCategory): void {
+  const current = activeCompetitorModels(state, category).some((model) => model.companyId === company.id);
+  if (current || state.date.year < 2024) return;
+  const last = latestPerformance(company, category);
+  const annualScale = company.id === 'nvidia' ? 1.27 : company.id === 'amd' ? 1.235 : 1.205;
+  const performance = Math.max(last * annualScale, 260 + (state.date.year - 2020) * (company.id === 'nvidia' ? 72 : 58));
+  const priceBase = category === 'gpu' ? 118_000 : 72_000;
+  const premium = company.id === 'nvidia' ? 1.28 : company.id === 'intel' ? 1.08 : 1;
+  const price = Math.round(priceBase * premium * (1 + Math.max(0, state.date.year - 2024) * .055) / 1000) * 1000;
+  const model: CompetitorModel = {
+    id: `future-${company.id}-${category}-${state.date.year}`,
+    companyId: company.id,
+    name: modelName(company, category, state.date.year),
+    category,
+    launchDate: { ...state.date },
+    endDate: { year: state.date.year + 1, week: 52 },
+    price,
+    performance,
+    efficiency: clamp(82 + company.technology * .17 + (state.date.year - 2024) * 1.6, 78, 99),
+    reliability: clamp(88 + company.brand * .055, 86, 98),
+    software: clamp(86 + company.technology * .09 + (company.id === 'nvidia' ? 4 : 0), 84, 99),
+    brand: company.brand,
+    fictional: false,
+    salesMomentum: company.id === 'nvidia' ? 1.38 : company.id === 'intel' ? 1.24 : 1.2,
+    marketShare: 0,
+  };
+  company.models.push(model);
+  company.history.unshift(`${state.date.year}年: ${model.name}を投入`);
+  addNotice(state, '大手新世代', `${company.name}が${model.name}を投入。市場基準が引き上がりました。`, 'warning');
 }
 
 function spawnStartup(state: GameState): void {
@@ -45,7 +80,7 @@ function spawnStartup(state: GameState): void {
     id: uid('startup'), name, real: false, color: `hsl(${Math.floor(Math.random() * 360)} 70% 58%)`,
     specialties: [Math.random() < .5 ? 'cpu' : 'gpu'],
     strategy: (['value', 'efficient', 'performance'] as const)[Math.floor(Math.random() * 3)] ?? 'balanced',
-    cash: 85_000_000, technology: 24 + Math.random() * 16, brand: 8, momentum: .9 + Math.random() * .35,
+    cash: 85_000_000, technology: 24 + Math.random() * 16, brand: 8, momentum: .75 + Math.random() * .25,
     marketShare: 0, status: 'active', foundedYear: state.date.year, models: [], nextLaunchWeek: state.absoluteWeek + 8,
     history: [`${state.date.year}年: 創業`],
   };
@@ -65,33 +100,37 @@ function addHistoricalModels(state: GameState): void {
       launchDate: { year: source.year, week: source.week ?? 1 }, endDate: { year: source.year + 2, week: 1 },
       price: source.price, performance: source.performance, efficiency: source.efficiency ?? 70,
       reliability: source.reliability ?? 82, software: source.software ?? 82, brand: company.brand,
-      fictional: false, salesMomentum: 1, marketShare: 0,
+      fictional: false, salesMomentum: company.id === 'nvidia' ? 1.34 : company.id === 'intel' ? 1.22 : 1.17, marketShare: 0,
     });
   }
 }
 
 function realMomentum(company: CompetitorCompany): number {
-  if (company.id === 'nvidia') return 1.35;
-  if (company.id === 'intel') return 1.25;
-  if (company.id === 'amd') return 1.12;
-  return 1.08;
+  if (company.id === 'nvidia') return 1.72;
+  if (company.id === 'intel') return 1.55;
+  if (company.id === 'amd') return 1.48;
+  return 1.22;
 }
 
 export function updateCompetitorsWeekly(state: GameState): void {
   addHistoricalModels(state);
   for (const company of state.competitors) {
     if (company.real) {
+      company.status = 'active';
       company.momentum = Math.max(company.momentum, realMomentum(company));
-      company.cash += 5_000_000 + company.brand * 90_000;
-      company.technology = Math.max(company.technology, company.id === 'nvidia' ? 85 : company.id === 'intel' ? 80 : 75);
+      company.cash += 16_000_000 + company.brand * 180_000;
+      company.technology = Math.max(company.technology, company.id === 'nvidia' ? 98 : company.id === 'intel' ? 93 : 91);
+      company.brand = Math.max(company.brand, company.id === 'nvidia' ? 96 : company.id === 'intel' ? 94 : 89);
+      for (const category of company.specialties) launchFutureRealModel(state, company, category);
     } else {
-      if (company.momentum <= .05) company.momentum = .78 + Math.random() * .34;
-      company.cash += Math.max(500_000, company.models.length * 1_800_000 * company.momentum) - 1_200_000;
+      if (company.momentum <= .05) company.momentum = .72 + Math.random() * .28;
+      company.cash += Math.max(350_000, company.models.length * 1_350_000 * company.momentum) - 1_350_000;
     }
 
     if (!company.real && company.status === 'active' && state.absoluteWeek >= company.nextLaunchWeek) launchModel(state, company);
     const current = activeCompetitorModels(state).filter((model) => model.companyId === company.id);
-    company.marketShare = clamp(current.reduce((sum, model) => sum + model.performance / Math.max(1, model.price / 45_000), 0) * .0035 * company.momentum, 0, .44);
+    const rawShare = current.reduce((sum, model) => sum + model.performance / Math.max(1, model.price / 45_000) * model.salesMomentum, 0);
+    company.marketShare = clamp(rawShare * (company.real ? .0045 : .003) * company.momentum, 0, company.real ? .62 : .3);
 
     if (!company.real) {
       if (company.cash < -20_000_000 && company.status === 'active') {
@@ -108,10 +147,10 @@ export function updateCompetitorsWeekly(state: GameState): void {
           addNotice(state, '競合撤退', `${company.name}が市場から撤退しました。`, 'info');
         }
       }
-      if (company.marketShare > .12 && company.status === 'active') {
-        company.brand = clamp(company.brand + .08, 0, 100);
-        company.technology += .006;
-        company.cash += 2_000_000;
+      if (company.marketShare > .1 && company.status === 'active') {
+        company.brand = clamp(company.brand + .055, 0, 100);
+        company.technology += .004;
+        company.cash += 1_400_000;
       }
     }
   }
