@@ -1,4 +1,4 @@
-import { generateDecisionEvent, nextDecisionEventWeek } from './event-system';
+import { generateDecisionEvent } from './event-system';
 import { updateCompanyWeekly } from './company-system';
 import { activeCompetitorModels, updateCompetitorsWeekly } from './competitor-system';
 import { getFactoryDefinition, updateContractsWeekly } from './manufacturing-system';
@@ -12,6 +12,10 @@ export const BUSINESS_MONTHS_PER_YEAR = 12;
 export const BUSINESS_WEEKS_PER_YEAR = BUSINESS_WEEKS_PER_MONTH * BUSINESS_MONTHS_PER_YEAR;
 
 interface RuntimeProduct extends ReleasedProduct { businessAgeWeeks?: number }
+
+export function nextBusinessEventWeek(absoluteWeek: number, initial = false): number {
+  return absoluteWeek + (initial ? 48 : 84 + Math.floor(Math.random() * 61));
+}
 
 export function businessDateLabel(state: GameState): string {
   const monthIndex = Math.floor(Math.max(0, state.absoluteWeek) / BUSINESS_WEEKS_PER_MONTH);
@@ -155,13 +159,14 @@ export interface BusinessWeekResult { structureChanged: boolean; sold: number; r
 
 export function advanceBusinessWeek(state: GameState): BusinessWeekResult {
   state.absoluteWeek += 1;
+  if (state.absoluteWeek <= 2 && state.nextEventWeek - state.absoluteWeek < 46) state.nextEventWeek = nextBusinessEventWeek(state.absoluteWeek, true);
   updateContractsWeekly(state);
   const sales = updateSales(state);
   updateCompanyWeekly(state);
   updateMarket(state);
   if (!state.activeEvent && state.absoluteWeek >= state.nextEventWeek) {
     state.activeEvent = generateDecisionEvent(state);
-    state.nextEventWeek = nextDecisionEventWeek(state.absoluteWeek);
+    state.nextEventWeek = nextBusinessEventWeek(state.absoluteWeek);
   }
   saveState(state);
   return { structureChanged: sales.structureChanged || Boolean(state.activeEvent), sold: sales.sold, revenue: sales.revenue };
