@@ -17,6 +17,12 @@ interface BuildingSpec {
   lightColor: THREE.Color;
 }
 
+interface CarState {
+  x: number;
+  lane: 0 | 1;
+  speed: number;
+}
+
 function seededRandom(seed: number): () => number {
   let value = seed >>> 0;
   return () => {
@@ -42,7 +48,6 @@ function addSky(scene: THREE.Scene): void {
     }),
   );
   scene.add(sky);
-
   const moon = sphere(3.6, new THREE.MeshBasicMaterial({ color: 0xffe9c9, toneMapped: false }), 34, 30, -105);
   moon.castShadow = false;
   scene.add(moon);
@@ -61,28 +66,24 @@ export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
   const facadePalette = [0x152432, 0x1a2b39, 0x20313e, 0x172733, 0x293a46, 0x213342];
   const lightPalette = [0xffd18a, 0x90d7ff, 0xffad7c, 0xb6ddff, 0xa9f2d5];
   const specs: BuildingSpec[] = [];
-
   const layers = [
-    { z: -17, count: 20, width: [2.0, 4.8], height: [7, 17], depth: [2.2, 4.2] },
-    { z: -25, count: 23, width: [2.2, 5.5], height: [8, 21], depth: [2.4, 4.8] },
-    { z: -34, count: 25, width: [2.5, 6.2], height: [9, 24], depth: [2.8, 5.4] },
-    { z: -45, count: 27, width: [2.8, 7.0], height: [10, 27], depth: [3.0, 5.8] },
-    { z: -58, count: 29, width: [3.0, 7.8], height: [11, 30], depth: [3.2, 6.2] },
-    { z: -73, count: 31, width: [3.4, 8.8], height: [12, 34], depth: [3.5, 6.8] },
-  ] as const;
+    { z: -17, count: 20, width: [2.0, 4.8] as const, height: [7, 17] as const, depth: [2.2, 4.2] as const },
+    { z: -25, count: 23, width: [2.2, 5.5] as const, height: [8, 21] as const, depth: [2.4, 4.8] as const },
+    { z: -34, count: 25, width: [2.5, 6.2] as const, height: [9, 24] as const, depth: [2.8, 5.4] as const },
+    { z: -45, count: 27, width: [2.8, 7.0] as const, height: [10, 27] as const, depth: [3.0, 5.8] as const },
+    { z: -58, count: 29, width: [3.0, 7.8] as const, height: [11, 30] as const, depth: [3.2, 6.2] as const },
+    { z: -73, count: 31, width: [3.4, 8.8] as const, height: [12, 34] as const, depth: [3.5, 6.8] as const },
+  ];
 
   layers.forEach((layer, layerIndex) => {
     for (let index = 0; index < layer.count; index += 1) {
-      const spread = 118;
       const width = layer.width[0] + random() * (layer.width[1] - layer.width[0]);
       const height = layer.height[0] + random() * (layer.height[1] - layer.height[0]);
       const depth = layer.depth[0] + random() * (layer.depth[1] - layer.depth[0]);
-      const x = -spread / 2 + index * (spread / Math.max(1, layer.count - 1)) + (random() - .5) * 2.6;
-      const z = layer.z - random() * (4 + layerIndex * .8);
       specs.push({
-        x,
+        x: -59 + index * (118 / Math.max(1, layer.count - 1)) + (random() - .5) * 2.6,
         y: height / 2 - .45,
-        z,
+        z: layer.z - random() * (4 + layerIndex * .8),
         width,
         height,
         depth,
@@ -93,11 +94,8 @@ export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
   });
 
   const landmarks: Array<[number, number, number, number, number]> = [
-    [-27, -27, 6.8, 29, 5.4],
-    [19, -31, 7.6, 34, 6.1],
-    [39, -47, 9.4, 41, 7.4],
-    [-44, -53, 8.8, 37, 6.8],
-    [4, -67, 10.4, 48, 8.0],
+    [-27, -27, 6.8, 29, 5.4], [19, -31, 7.6, 34, 6.1], [39, -47, 9.4, 41, 7.4],
+    [-44, -53, 8.8, 37, 6.8], [4, -67, 10.4, 48, 8.0],
   ];
   landmarks.forEach(([x, z, width, height, depth], index) => specs.push({
     x, y: height / 2 - .45, z, width, height, depth,
@@ -111,7 +109,6 @@ export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
     new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .91, metalness: .05 }),
     specs.length,
   );
-  buildings.frustumCulled = true;
   specs.forEach((spec, index) => {
     dummy.position.set(spec.x, spec.y, spec.z);
     dummy.rotation.set(0, 0, 0);
@@ -124,8 +121,11 @@ export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
   if (buildings.instanceColor) buildings.instanceColor.needsUpdate = true;
   city.add(buildings);
 
-  const windowMaterial = new THREE.MeshBasicMaterial({ map: cityWindowTexture(), color: 0xffffff, toneMapped: false });
-  const windows = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), windowMaterial, specs.length);
+  const windows = new THREE.InstancedMesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({ map: cityWindowTexture(), color: 0xffffff, toneMapped: false }),
+    specs.length,
+  );
   specs.forEach((spec, index) => {
     dummy.position.set(spec.x, spec.y, spec.z + spec.depth / 2 + .018);
     dummy.rotation.set(0, 0, 0);
@@ -171,18 +171,18 @@ export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
   city.add(roadStripe);
 
   const carCount = 18;
-  const carMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .45, metalness: .25 });
-  const cars = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), carMaterial, carCount);
-  const carX = new Float32Array(carCount);
-  const carLane = new Int8Array(carCount);
-  const carSpeed = new Float32Array(carCount);
-  const carColor = [0x8c4d52, 0x4d758f, 0xb08b55, 0x5f7c61, 0x6d628d];
-  for (let index = 0; index < carCount; index += 1) {
-    carX[index] = -55 + index * 6.2;
-    carLane[index] = index % 2;
-    carSpeed[index] = 1.8 + (index % 5) * .24;
-    cars.setColorAt(index, new THREE.Color(carColor[index % carColor.length] ?? 0x6b7480));
-  }
+  const cars = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .45, metalness: .25 }),
+    carCount,
+  );
+  const carStates: CarState[] = Array.from({ length: carCount }, (_, index) => ({
+    x: -55 + index * 6.2,
+    lane: (index % 2) as 0 | 1,
+    speed: 1.8 + (index % 5) * .24,
+  }));
+  const carColors = [0x8c4d52, 0x4d758f, 0xb08b55, 0x5f7c61, 0x6d628d];
+  carStates.forEach((_state, index) => cars.setColorAt(index, new THREE.Color(carColors[index % carColors.length] ?? 0x6b7480)));
   if (cars.instanceColor) cars.instanceColor.needsUpdate = true;
   city.add(cars);
 
@@ -194,17 +194,17 @@ export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
   city.add(horizonGlow);
 
   const updateCars = (delta: number): void => {
-    for (let index = 0; index < carCount; index += 1) {
-      const direction = carLane[index] === 0 ? 1 : -1;
-      carX[index] += carSpeed[index] * delta * direction;
-      if (carX[index] > 64) carX[index] = -64;
-      if (carX[index] < -64) carX[index] = 64;
-      dummy.position.set(carX[index], -.28, -11.05 - carLane[index] * 1.28);
+    carStates.forEach((state, index) => {
+      const direction = state.lane === 0 ? 1 : -1;
+      state.x += state.speed * delta * direction;
+      if (state.x > 64) state.x = -64;
+      if (state.x < -64) state.x = 64;
+      dummy.position.set(state.x, -.28, -11.05 - state.lane * 1.28);
       dummy.rotation.set(0, 0, 0);
       dummy.scale.set(1.0, .26, .46);
       dummy.updateMatrix();
       cars.setMatrixAt(index, dummy.matrix);
-    }
+    });
     cars.instanceMatrix.needsUpdate = true;
   };
   updateCars(0);
