@@ -29,7 +29,7 @@ let saveManagerOpen = false;
 let lastBusinessWeek = -1;
 let runtimeStructure = '';
 let gameTimer = 0;
-const secondsPerTechnologyWeek = 5 * 60 * 60 / 52;
+const secondsPerTechnologyWeek = 30 * 60 / 52;
 
 const projectProgress = (): number => state.projects.find((project) => project.stage !== 'ready' && !project.paused)?.progress ?? 0;
 const activeProductGlow = (): number => {
@@ -81,7 +81,8 @@ const gameTick = (): void => {
     activePanel: state.activePanel,
     projectProgress: projectProgress(),
     productGlow: activeProductGlow(),
-    staffCount: state.staff.length,
+    staffCount: Math.min(30, state.staff.length),
+    staff: state.staff.slice(0, 30).map((member) => ({ id: member.id, name: member.name, role: member.role, morale: member.morale, fatigue: member.fatigue })),
     officeLevel: state.officeLevel,
     researchActive: Boolean(state.activeResearch && !state.activeResearch.paused),
     cashHealth: Math.max(0, Math.min(1, state.cash / 80_000_000)),
