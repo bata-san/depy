@@ -9,7 +9,10 @@ const setText = (element: Element | null, value: string): void => {
 };
 
 const setMeter = (element: Element | null, value: number): void => {
-  if (element instanceof HTMLElement) element.style.width = `${Math.max(0, Math.min(100, value))}%`;
+  if (element instanceof HTMLElement) {
+    const width = `${Math.max(0, Math.min(100, value))}%`;
+    if (element.style.width !== width) element.style.width = width;
+  }
 };
 
 export function updateRealtimeUI(root: HTMLElement, state: GameState): void {
@@ -40,7 +43,8 @@ export function updateRealtimeUI(root: HTMLElement, state: GameState): void {
 }
 
 export function realtimeStructureKey(state: GameState): string {
-  const projects = state.projects.map((project) => `${project.id}:${project.stage}:${project.paused}:${project.issues.filter((issue) => issue.status === 'open').length}`).join('|');
+  const projects = state.projects.map((project) => `${project.id}:ready=${project.stage === 'ready'}:paused=${project.paused}:issues=${project.issues.filter((issue) => issue.status === 'open').length}`).join('|');
   const research = state.activeResearch ? `${state.activeResearch.area}:${state.activeResearch.paused}` : 'none';
-  return `${projects}#${research}#products:${state.products.length}`;
+  const event = state.activeEvent?.id ?? 'none';
+  return `${projects}#research:${research}#products:${state.products.length}#event:${event}#notices:${state.notifications.length}`;
 }
