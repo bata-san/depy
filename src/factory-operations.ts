@@ -5,6 +5,7 @@ import type { FactoryContract, GameState, ReleasedProduct } from './types';
 
 type ProductionLine = FactoryContract & {
   lineNumber?: number;
+  /** Legacy save field. Maintenance no longer affects gameplay. */
   maintenance?: number;
   processControl?: number;
   lineExperience?: number;
@@ -17,6 +18,7 @@ const CAPACITY_MULTIPLIERS = [1, 4, 16, 64, 256, 1024, 4096] as const;
 export interface FactoryLineSnapshot {
   lineNumber: number;
   capacityTier: number;
+  /** Compatibility-only value for old UI/save readers. Always 100. */
   maintenance: number;
   processControl: number;
   experience: number;
@@ -33,7 +35,8 @@ function line(contract: FactoryContract, state: GameState): ProductionLine {
     const siblings = state.contracts.filter((item) => item.factoryId === contract.factoryId);
     runtime.lineNumber = Math.max(1, siblings.indexOf(contract) + 1);
   }
-  runtime.maintenance ??= 88;
+  // Old saves may contain a degraded maintenance value. Neutralize it permanently.
+  runtime.maintenance = 100;
   runtime.processControl ??= 68;
   runtime.lineExperience ??= 12;
   runtime.lastUtilization ??= 0;
@@ -109,15 +112,14 @@ export function getFactoryLineSnapshot(state: GameState, contract: FactoryContra
   const globalManagement = factoryManagementFactor(state);
   const localOperations = operationsStaffEffect(state);
   const management = clamp(globalManagement * (.72 + localOperations * .28), .1, 1.12);
-  const maintenanceFactor = clamp((runtime.maintenance ?? 88) / 88, .3, 1.08);
   const processFactor = clamp(.68 + (runtime.processControl ?? 68) / 220, .68, 1.14);
   const experienceFactor = clamp(.8 + (runtime.lineExperience ?? 12) / 285, .8, 1.12);
   const factoryFactor = factory ? clamp((factory.quality + factory.reliability) / 190, .58, 1.08) : .8;
-  const effectiveCapacity = Math.max(0, Math.floor(contract.committedCapacity * management * maintenanceFactor * processFactor * experienceFactor * factoryFactor));
+  const effectiveCapacity = Math.max(0, Math.floor(contract.committedCapacity * management * processFactor * experienceFactor * factoryFactor));
   return {
     lineNumber: runtime.lineNumber ?? 1,
     capacityTier: runtime.capacityTier ?? 0,
-    maintenance: runtime.maintenance ?? 88,
+    maintenance: 100,
     processControl: runtime.processControl ?? 68,
     experience: runtime.lineExperience ?? 12,
     utilization,
@@ -158,31 +160,14 @@ export function updateFactoryLineOperations(state: GameState): void {
     const allocation = allocatedToLine(state, contract.id);
     const utilization = clamp(allocation / Math.max(1, contract.committedCapacity), 0, 1.8);
     runtime.lastUtilization = utilization;
-    const previousMaintenance = runtime.maintenance ?? 88;
-    const tier = runtime.capacityTier ?? 0;
-    const overload = Math.max(0, utilization - 1);
-    const scaleWear = tier * .08 + Math.sqrt(Math.max(1, contract.committedCapacity / Math.max(1, definition(contract)?.weeklyCapacity ?? contract.committedCapacity))) * .04;
-    runtime.maintenance = clamp(previousMaintenance - (.34 + utilization * .66 + overload * 2.6 + scaleWear + Math.max(0, .78 - management) * 1.7), 0, 100);
+    runtime.maintenance = 100;
     runtime.lineExperience = clamp((runtime.lineExperience ?? 12) + utilization * (.48 + management * .42), 0, 100);
-    if (runtime.maintenance < 18) contract.reliabilityModifier = Math.min(contract.reliabilityModifier, .52);
-    else if (runtime.maintenance < 35) contract.reliabilityModifier = Math.min(contract.reliabilityModifier, .74);
-    if (previousMaintenance >= 30 && runtime.maintenance < 30) addNotice(state, '工場ライン要整備', `${definition(contract)?.name ?? '工場'} 第${runtime.lineNumber}ラインの保守状態が悪化しています。`, 'warning');
   }
 }
 
-export function serviceFactoryLine(state: GameState, contractId: string): { ok: boolean; message: string } {
-  const contract = state.contracts.find((item) => item.id === contractId && item.active);
-  const factory = contract && definition(contract);
-  if (!contract || !factory) return { ok: false, message: '工場ラインが見つかりません。' };
-  const runtime = line(contract, state);
-  const tier = runtime.capacityTier ?? 0;
-  const cost = Math.round(factory.signupFee * (.055 + tier * .025) + contract.committedCapacity * factory.reservationRate * (.28 + tier * .04));
-  if (state.cash < cost) return { ok: false, message: 'ライン整備費が不足しています。' };
-  state.cash -= cost;
-  addLedger(state, `${factory.name} 第${runtime.lineNumber}ライン整備`, -cost, 'factory');
-  runtime.maintenance = clamp((runtime.maintenance ?? 88) + 42, 0, 100);
-  contract.reliabilityModifier = Math.max(contract.reliabilityModifier, .96);
-  return { ok: true, message: `第${runtime.lineNumber}ラインを整備しました。` };
+/** Kept only so older UI code cannot crash while hot-reloading. There is no maintenance system anymore. */
+export function serviceFactoryLine(_state: GameState, _contractId: string): { ok: boolean; message: string } {
+  return { ok: false, message: 'ライン整備は廃止されました。工程改善と生産管理で効率を上げてください。' };
 }
 
 export function improveFactoryLine(state: GameState, contractId: string): { ok: boolean; message: string } {
@@ -197,7 +182,6 @@ export function improveFactoryLine(state: GameState, contractId: string): { ok: 
   state.cash -= cost;
   addLedger(state, `${factory.name} 第${runtime.lineNumber}ライン工程改善`, -cost, 'factory');
   runtime.processControl = clamp((runtime.processControl ?? 68) + 8, 0, 100);
-  runtime.maintenance = clamp((runtime.maintenance ?? 88) + 9, 0, 100);
   return { ok: true, message: `第${runtime.lineNumber}ラインの工程管理を改善しました。` };
 }
 
@@ -218,7 +202,6 @@ export function expandFactoryLine(state: GameState, contractId: string): { ok: b
   const maximum = factoryMaximumCapacity(state, contract);
   contract.committedCapacity = Math.min(maximum, Math.max(contract.committedCapacity, Math.round(maximum * .5 / 50) * 50));
   contract.setupRemaining = Math.max(contract.setupRemaining, 2 + Math.min(6, nextTier));
-  runtime.maintenance = clamp((runtime.maintenance ?? 88) - 8 - nextTier * 2, 35, 100);
   runtime.processControl = clamp((runtime.processControl ?? 68) - 2, 45, 100);
   addNotice(state, '量産ライン拡張', `${factory.name} 第${runtime.lineNumber}ラインをTier ${nextTier + 1}へ拡張。最大${maximum.toLocaleString()}個/5秒まで増枠できます。`, 'good');
   return { ok: true, message: `ラインをTier ${nextTier + 1}へ拡張しました。` };
