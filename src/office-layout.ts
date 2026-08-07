@@ -7,6 +7,19 @@ import {
   partsShelf, plant, productShowcase, researchBench, serverRack, staffPerson, waferInspectionStation, wallDisplay,
 } from './office-models';
 
+function expansionFloor(group: THREE.Group, x: number, z: number, width: number, depth: number, accent: number): void {
+  group.add(box(width, .18, depth, material(0x17232d, .82, .08), x, -.1, z));
+  group.add(box(width - .22, .025, depth - .22, material(0x243846, .92, .02), x, .005, z));
+  group.add(box(width * .55, .032, depth * .52, material(accent, .8, .03), x, .025, z));
+  const glass = new THREE.MeshStandardMaterial({ color: 0x8bc9e5, transparent: true, opacity: .1, roughness: .18, metalness: .2, depthWrite: false });
+  group.add(box(width, 2.65, .035, glass, x, 1.32, z - depth / 2));
+  group.add(box(width, .07, .07, material(0x334b59, .35, .62), x, 2.62, z - depth / 2));
+}
+
+function addExpansionDeskCluster(group: THREE.Group, positions: Array<[number, number, number]>, accent: number): void {
+  positions.forEach(([x, z, rotation], index) => group.add(desk(x, z, rotation, index % 2 ? accent : 0x71cfff)));
+}
+
 export function buildOfficeLayout(scene: THREE.Scene) {
   const office = new THREE.Group();
   addFloorTiles(office);
@@ -21,10 +34,8 @@ export function buildOfficeLayout(scene: THREE.Scene) {
   addZoneFloor(office, 3.7, 5.3, 0x1c3139, 6.0, .15);
 
   const developmentDesks = [
-    desk(-5.65, -4.0, 0, 0x5aaeff),
-    desk(-2.75, -4.0, 0, 0x62c9ff),
-    desk(-5.65, -1.05, Math.PI, 0x6fd6b0),
-    desk(-2.75, -1.05, Math.PI, 0xffbc6b),
+    desk(-5.65, -4.0, 0, 0x5aaeff), desk(-2.75, -4.0, 0, 0x62c9ff),
+    desk(-5.65, -1.05, Math.PI, 0x6fd6b0), desk(-2.75, -1.05, Math.PI, 0xffbc6b),
   ];
   developmentDesks.forEach((item) => office.add(item));
 
@@ -59,22 +70,52 @@ export function buildOfficeLayout(scene: THREE.Scene) {
   const robot = deliveryRobot();
   office.add(robot);
   const dataCubes = [
-    floatingDataCube(0x5ec6ff, -4.25, 2.5, 3.45),
-    floatingDataCube(0x62e6ad, -5.65, 2.18, 3.9),
-    floatingDataCube(0xffbd68, 4.12, 2.32, 3.05),
-    floatingDataCube(0xc58cff, 5.35, 2.62, 3.82),
+    floatingDataCube(0x5ec6ff, -4.25, 2.5, 3.45), floatingDataCube(0x62e6ad, -5.65, 2.18, 3.9),
+    floatingDataCube(0xffbd68, 4.12, 2.32, 3.05), floatingDataCube(0xc58cff, 5.35, 2.62, 3.82),
   ];
   dataCubes.forEach((cube) => office.add(cube));
 
-  const staffColors = [0x5aa7ff, 0xff8d71, 0x79d69c, 0xc998ff, 0xffc56f, 0x62cbd3, 0xf178a7, 0x95c76f, 0x7398e8, 0xe89f73, 0x70d1b6, 0xb286e8];
-  const staffPositions: Array<[number, number, number]> = [
-    [-5.65, -2.9, Math.PI], [-2.75, -2.9, Math.PI], [-5.65, -2.12, 0], [-2.75, -2.12, 0],
-    [5.0, -2.9, Math.PI], [1.9, -2.9, Math.PI], [-5.05, 2.7, 0], [.2, 2.4, 0],
-    [4.85, 2.45, 0], [6.0, -.15, Math.PI / 2], [-.85, 4.92, Math.PI / 2], [2.15, 4.92, -Math.PI / 2],
+  const expansionGroups = [new THREE.Group(), new THREE.Group(), new THREE.Group(), new THREE.Group()];
+  expansionGroups.forEach((group, index) => { group.name = `office-expansion-${index + 2}`; group.visible = false; office.add(group); });
+
+  const east = expansionGroups[0]!;
+  expansionFloor(east, 11.5, .25, 7.2, 11.6, 0x244c5c);
+  addExpansionDeskCluster(east, [[9.6,-3.8,0],[12.5,-3.8,0],[9.6,-.7,Math.PI],[12.5,-.7,Math.PI],[9.6,3.0,0],[12.5,3.0,0]], 0x61d8bb);
+  east.add(serverRack(14.15, -.4), serverRack(14.15, 2.2), plant(8.4, 5.1, .9));
+  east.add(wallDisplay(11.55, 3.55, -5.48, 3.8, 0x62d9ff, 'east-ops-screen'));
+
+  const west = expansionGroups[1]!;
+  expansionFloor(west, -11.5, .25, 7.2, 11.6, 0x3d354d);
+  addExpansionDeskCluster(west, [[-9.5,-3.8,0],[-12.4,-3.8,0],[-9.5,-.7,Math.PI],[-12.4,-.7,Math.PI]], 0xc494ff);
+  west.add(researchBench(-11.0, 3.15), waferInspectionStation(-14.05, 2.75), plant(-8.45, 5.0, .9));
+
+  const north = expansionGroups[2]!;
+  expansionFloor(north, 0, 11.2, 18.5, 8.0, 0x3f3c2c);
+  addExpansionDeskCluster(north, [[-6.2,9.3,0],[-3.2,9.3,0],[3.2,9.3,0],[6.2,9.3,0],[-6.2,12.4,Math.PI],[-3.2,12.4,Math.PI],[3.2,12.4,Math.PI],[6.2,12.4,Math.PI]], 0xffc96d);
+  north.add(meetingArea(0, 13.4), plant(-8.4, 13.9, 1), plant(8.4, 13.9, 1));
+
+  const executive = expansionGroups[3]!;
+  expansionFloor(executive, 0, 18.4, 13.5, 5.4, 0x27423a);
+  executive.add(productShowcase(4.0, 18.6), meetingArea(-2.0, 18.5), plant(-6.1, 20.4, 1.05), plant(6.1, 20.4, 1.05));
+
+  const staffColors = [0x5aa7ff,0xff8d71,0x79d69c,0xc998ff,0xffc56f,0x62cbd3,0xf178a7,0x95c76f,0x7398e8,0xe89f73,0x70d1b6,0xb286e8,0x5ab8e8,0xe8c45a,0x8ac976,0xe57d9f,0x8b96e7,0x5fd0c4,0xd58ce6,0xe59a66,0x6eb6ef,0x81cd89,0xecbd67,0xc688e7,0x68cbc0,0xeb8a85,0x79a4e8,0xa6cb68,0xda8fc5,0x71c8e0];
+  const basePositions: Array<[number, number, number]> = [
+    [-5.65,-2.9,Math.PI],[-2.75,-2.9,Math.PI],[-5.65,-2.12,0],[-2.75,-2.12,0],[5,-2.9,Math.PI],[1.9,-2.9,Math.PI],[-5.05,2.7,0],[.2,2.4,0],[4.85,2.45,0],[6,-.15,Math.PI/2],
   ];
-  addStaffContactShadows(office, staffPositions);
-  const people = staffPositions.map(([x, z, rotation], index) => staffPerson(staffColors[index] ?? 0x6dafff, x, z, rotation, index));
-  people.forEach((person) => office.add(person));
+  const eastPositions: Array<[number, number, number]> = [[9.6,-2.8,Math.PI],[12.5,-2.8,Math.PI],[9.6,.2,0],[12.5,.2,0],[9.6,4,Math.PI],[12.5,4,Math.PI],[13.7,1.1,Math.PI/2],[8.7,1.6,-Math.PI/2]];
+  const westPositions: Array<[number, number, number]> = [[-9.5,-2.8,Math.PI],[-12.4,-2.8,Math.PI],[-9.5,.2,0],[-12.4,.2,0],[-11,2.3,0],[-13.7,2.3,0],[-8.7,3.9,Math.PI/2]];
+  const northPositions: Array<[number, number, number]> = [[-6.2,10.3,Math.PI],[-3.2,10.3,Math.PI],[3.2,10.3,Math.PI],[6.2,10.3,Math.PI],[-6.2,11.4,0],[-3.2,11.4,0],[3.2,11.4,0],[6.2,11.4,0]];
+  const executivePositions: Array<[number, number, number]> = [[-2,17.2,0],[1,17.2,0],[4,17.2,0],[0,19.5,Math.PI]];
+  const allPositions = [...basePositions, ...eastPositions, ...westPositions, ...northPositions, ...executivePositions].slice(0, 30);
+  addStaffContactShadows(office, basePositions);
+  const people = allPositions.map(([x, z, rotation], index) => staffPerson(staffColors[index % staffColors.length] ?? 0x6dafff, x, z, rotation, index));
+  people.forEach((person, index) => {
+    if (index < basePositions.length) office.add(person);
+    else if (index < basePositions.length + eastPositions.length) east.add(person);
+    else if (index < basePositions.length + eastPositions.length + westPositions.length) west.add(person);
+    else if (index < basePositions.length + eastPositions.length + westPositions.length + northPositions.length) north.add(person);
+    else executive.add(person);
+  });
   const characterAnimations = new CharacterAnimationSystem(people);
 
   const glassPartition = new THREE.MeshStandardMaterial({ color: 0x7faec3, transparent: true, opacity: .13, roughness: .18, metalness: .18, depthWrite: false });
@@ -84,11 +125,10 @@ export function buildOfficeLayout(scene: THREE.Scene) {
   addEquipmentCases(office);
   addZoneSigns(office);
   addDeskAccentBars(office);
-
   scene.add(office);
 
   return {
     office, ceilingLights, developmentDesks, research, showcase, meeting, racks, waferStation,
-    robot, dataCubes, characterAnimations, competitorScreen,
+    robot, dataCubes, characterAnimations, competitorScreen, people, expansionGroups,
   };
 }
