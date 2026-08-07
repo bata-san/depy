@@ -39,6 +39,32 @@ function createIssue(project: DevelopmentProject, quality: number, missingRole: 
   };
 }
 
+function applyStageCraft(state: GameState, project: DevelopmentProject, stage: ProjectStage, quality: number, leadName: string): void {
+  const excellence = clamp((quality - 65) / 35, -1, 1);
+  if (stage === 'architecture' || stage === 'tapeout') {
+    project.metrics.performance *= 1 + excellence * .032;
+    project.metrics.singlePerformance *= 1 + excellence * .03;
+    project.metrics.multiPerformance *= 1 + excellence * .034;
+    project.metrics.efficiency = clamp(project.metrics.efficiency + excellence * 3.5, 10, 180);
+  }
+  if (stage === 'prototype') {
+    project.metrics.yieldRate = clamp(project.metrics.yieldRate + excellence * 5.5, 20, 99);
+    project.metrics.thermals = clamp(project.metrics.thermals + excellence * 4.2, 15, 99);
+    project.metrics.unitCost *= clamp(1 - excellence * .045, .9, 1.08);
+  }
+  if (stage === 'validation' || stage === 'ready') {
+    project.metrics.reliability = clamp(project.metrics.reliability + excellence * 5.8, 30, 99);
+    project.metrics.softwareQuality = clamp(project.metrics.softwareQuality + excellence * 5.2, 25, 99);
+  }
+
+  if (quality >= 86 && stage !== 'ready' && Math.random() < .18) {
+    const boost = 1.012 + Math.random() * .018;
+    project.metrics.performance *= boost;
+    project.metrics.efficiency = clamp(project.metrics.efficiency + 1.5 + Math.random() * 2.2, 10, 180);
+    addNotice(state, 'ひらめき', `${leadName}を中心に設計上のブレイクスルーが発生。${project.codeName}の完成度が上がりました。`, 'good');
+  }
+}
+
 export function advanceStaffDrivenRealtime(state: GameState, deltaSeconds: number, speed: GameState['speed']): boolean {
   if (speed === 0) return false;
   let changed = false;
@@ -65,6 +91,7 @@ export function advanceStaffDrivenRealtime(state: GameState, deltaSeconds: numbe
         }
       }
 
+      applyStageCraft(state, project, project.stage, staff.quality, staff.leadName);
       const weakness = Math.max(0, 72 - staff.quality);
       project.performancePenalty += weakness * .025;
       project.reliabilityPenalty += weakness * .045;
