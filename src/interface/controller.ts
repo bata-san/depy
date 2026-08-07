@@ -2,8 +2,8 @@ import { ROLE_LABELS } from '../data';
 import {
   cancelContract, changeContractCapacity, changeProductAllocation, changeProductPrice, contractFactory,
   createSeries, defaultDesign, defaultTechnology, dismissStaff, endProductNow, giveStaffBonus, hireCandidate,
-  improveProductSupport, launchProduct, releaseProductUpdate, resetState, resolveDecisionEvent, resolveProjectIssue,
-  runMarketingCampaign, saveState, startGeneration, startResearch, takeLoan, toggleProjectPause, toggleResearchPause,
+  improveFactoryLine, improveProductSupport, launchProduct, releaseProductUpdate, resetState, resolveDecisionEvent, resolveProjectIssue,
+  runMarketingCampaign, saveState, serviceFactoryLine, startGeneration, startResearch, takeLoan, toggleProjectPause, toggleResearchPause,
   trainStaff, upgradeFacility, calculateMetrics, inferAudience,
 } from '../simulation';
 import { addLedger, addNotice, clamp } from '../state';
@@ -108,6 +108,8 @@ export class InterfaceController {
     else if (action === 'product-marketing') result = runMarketingCampaign(this.state, button.dataset.id ?? '', 3_000_000);
     else if (action === 'product-eol') { if (!confirm('この製品を今すぐ終売しますか？')) return; endProductNow(this.state, button.dataset.id ?? ''); structural = true; }
     else if (action === 'contract-factory') { result = contractFactory(this.state, button.dataset.id ?? '', Number(button.dataset.capacity ?? 1000)); structural = Boolean(result?.ok); }
+    else if (action === 'service-factory') { result = serviceFactoryLine(this.state, button.dataset.id ?? ''); structural = false; }
+    else if (action === 'improve-factory') { result = improveFactoryLine(this.state, button.dataset.id ?? ''); structural = false; }
     else if (action === 'cancel-contract') { if (!confirm('工場契約を解約しますか？最低期間中は違約金が発生します。')) return; result = cancelContract(this.state, button.dataset.id ?? ''); structural = Boolean(result?.ok); }
     else if (action === 'start-research') { result = startResearch(this.state, button.dataset.area as ResearchArea); structural = Boolean(result?.ok); }
     else if (action === 'toggle-research') { toggleResearchPause(this.state); structural = true; }
