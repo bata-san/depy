@@ -15,8 +15,11 @@ export const addWeeks = (date: GameDate, weeks: number): GameDate => {
 };
 export const dateLabel = (date: GameDate): string => `${date.year}年 ${date.week}週`;
 
+type BusinessLedgerEntry = LedgerEntry & { businessWeek?: number };
+
 export function addLedger(state: GameState, label: string, amount: number, category: LedgerEntry['category']): void {
-  state.ledger.unshift({ id: uid('ledger'), date: { ...state.date }, label, amount, category });
+  const entry: BusinessLedgerEntry = { id: uid('ledger'), date: { ...state.date }, label, amount, category, businessWeek: state.absoluteWeek };
+  state.ledger.unshift(entry);
   state.ledger = state.ledger.slice(0, 300);
   if (amount > 0) state.stats.lifetimeRevenue += amount;
   state.stats.lifetimeProfit += amount;
