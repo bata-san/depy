@@ -82,8 +82,21 @@ export function updateCompanyWeekly(state: GameState): void {
     const working = roleLoad > 0 || Boolean(state.activeResearch && !state.activeResearch.paused);
     const condition = staffWeeklyConditionDelta(member, working ? 1 + roleLoad : 0, chemistry);
     member.fatigue = clamp(member.fatigue + condition.fatigue, 0, 100);
-    member.morale = clamp(member.morale + condition.morale + (state.cash < 0 ? -3.5 : member.fatigue > 82 ? -2 : member.fatigue < 35 ? .3 : 0), 0, 100);
-    member.loyalty = clamp(member.loyalty + (member.morale < 35 ? -1.2 : member.morale > 80 ? .18 : 0) + (chemistry >= 75 ? .08 : 0), 0, 100);
+
+    const financeMood = state.cash < -25_000_000 ? -.42 : state.cash < 0 ? -.16 : 0;
+    const exhaustionMood = member.fatigue > 90 ? -.32 : member.fatigue > 80 ? -.12 : member.fatigue < 38 ? .08 : 0;
+    member.morale = clamp(member.morale + condition.morale + financeMood + exhaustionMood, 0, 100);
+
+    const loyaltyTarget = clamp(
+      42 + member.morale * .42 + chemistry * .12 + (member.traits.includes('loyal') ? 18 : 0) - (member.traits.includes('temperamental') ? 7 : 0),
+      32,
+      96,
+    );
+    let loyaltyDelta = (loyaltyTarget - member.loyalty) * .018;
+    if (member.loyalty <= 8) loyaltyDelta = Math.max(loyaltyDelta, 1.1);
+    else if (member.loyalty <= 24) loyaltyDelta = Math.max(loyaltyDelta, .42);
+    if (state.cash < -25_000_000) loyaltyDelta -= .12;
+    member.loyalty = clamp(member.loyalty + clamp(loyaltyDelta, -.38, 1.2), 0, 100);
     member.xp += condition.xp;
   }
   if (state.absoluteWeek > 0 && state.absoluteWeek % 24 === 0 && chemistry >= 78) addNotice(state, 'チーム好調', `チーム相性 ${Math.round(chemistry)}。部門間の連携が高い状態を維持しています。`, 'good');
