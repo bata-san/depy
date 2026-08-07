@@ -6,7 +6,6 @@ const charcoal = material(0x1b2730, .48, .45);
 const steel = material(0x40525e, .28, .7);
 const aluminum = material(0x8aa0ab, .22, .74);
 const deskTop = material(0x263640, .48, .34);
-const white = material(0xe7ecee, .56, .05);
 const rubber = material(0x10161b, .68, .24);
 const wood = material(0x6a4f39, .62, .08);
 const glass = new THREE.MeshPhysicalMaterial({ color: 0x8ecfe7, roughness: .08, metalness: .04, transmission: .5, transparent: true, opacity: .2, depthWrite: false });
@@ -95,7 +94,8 @@ export function premiumDesk(x: number, z: number, rotation = 0, accent = 0x5bbcf
   group.add(box(.07, .42, .08, steel, -.32, 1.15, -.19));
   group.add(roundedBox(.46, .035, .25, graphite, -.32, .99, -.12));
 
-  const secondary = screenPanel(.54, .34, new THREE.Color(accent).offsetHSL(.08, -.06, .03).getHex(), 'secondary-screen');
+  const secondaryAccent = new THREE.Color(accent).offsetHSL(.08, -.06, .03).getHex();
+  const secondary = screenPanel(.54, .34, secondaryAccent, 'secondary-screen');
   secondary.position.set(.5, 1.37, -.16);
   secondary.rotation.y = -.18;
   group.add(secondary);
@@ -104,8 +104,7 @@ export function premiumDesk(x: number, z: number, rotation = 0, accent = 0x5bbcf
   for (let key = 0; key < 8; key += 1) group.add(box(.07, .018, .055, material(0x617884, .6, .1), -.43 + key * .085, 1.045, .2));
   group.add(roundedBox(.13, .05, .19, material(0x182027, .54, .28), .45, 1.05, .24));
 
-  const tower = roundedBox(.42, .84, .62, graphite, .78, .5, -.1);
-  group.add(tower);
+  group.add(roundedBox(.42, .84, .62, graphite, .78, .5, -.1));
   group.add(box(.32, .62, .018, glass, .78, .53, -.42));
   const fan = new THREE.Group();
   fan.name = 'pc-fan';
@@ -189,8 +188,10 @@ export function premiumProductShowcase(x: number, z: number): THREE.Group {
     gpu.add(fan);
   }
   group.add(gpu);
-  group.add(screenPanel(.72, .42, 0xffa45d));
-  const label = group.children[group.children.length - 1]!; label.position.set(0, 1.7, -.7); label.rotation.x = -.05;
+  const label = screenPanel(.72, .42, 0xffa45d);
+  label.position.set(0, 1.7, -.7);
+  label.rotation.x = -.05;
+  group.add(label);
   shadows(group); return group;
 }
 
@@ -198,7 +199,7 @@ export function premiumMeetingArea(x: number, z: number): THREE.Group {
   const group = new THREE.Group(); group.position.set(x, 0, z); group.name = 'meeting-area';
   group.add(roundedBox(2.5, .13, 1.35, wood, 0, .83, 0));
   group.add(box(.13, .72, 1.05, graphite, 0, .43, 0));
-  for (const [cx, cz, rot] of [[-1.18,0,Math.PI/2],[1.18,0,-Math.PI/2],[0,-.86,0],[0,.86,Math.PI]] as Array<[number,number,number]>) {
+  for (const [cx, cz, rot] of [[-1.18,0,Math.PI/2],[1.18,0,-Math.PI/2],[0,-.86,0],[0,.86,Math.PI]] as Array<[number, number, number]>) {
     const chair = new THREE.Group(); chair.position.set(cx, 0, cz); chair.rotation.y = rot;
     chair.add(roundedBox(.48, .12, .48, material(0x273944, .55, .28), 0, .54, 0));
     chair.add(roundedBox(.48, .68, .12, material(0x24343d, .56, .28), 0, .85, -.22));
@@ -235,9 +236,13 @@ export function premiumDeliveryRobot(): THREE.Group {
   group.position.set(2.2, 0, .4); shadows(group); return group;
 }
 
-export function premiumDataCube(accent: number, x: number, y: number, z: number): THREE.Group {
-  const group = new THREE.Group(); group.position.set(x, y, z); group.name = 'data-cube';
-  group.add(roundedBox(.42, .42, .42, emissiveMaterial(0x14242d, accent, .45)));
-  group.add(box(.54, .025, .025, material(accent, .3, .46), 0, 0, 0)); group.add(box(.025, .54, .025, material(accent, .3, .46), 0, 0, 0)); group.add(box(.025, .025, .54, material(accent, .3, .46), 0, 0, 0));
-  return group;
+export function premiumDataCube(accent: number, x: number, y: number, z: number): THREE.Mesh {
+  const cube = roundedBox(.42, .42, .42, emissiveMaterial(0x14242d, accent, .45));
+  cube.position.set(x, y, z);
+  cube.name = 'data-cube';
+  cube.userData.baseY = y;
+  cube.add(box(.54, .025, .025, material(accent, .3, .46), 0, 0, 0));
+  cube.add(box(.025, .54, .025, material(accent, .3, .46), 0, 0, 0));
+  cube.add(box(.025, .025, .54, material(accent, .3, .46), 0, 0, 0));
+  return cube;
 }
