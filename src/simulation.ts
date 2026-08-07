@@ -1,5 +1,6 @@
 import { SERIES_FOCUS_LABELS } from './data';
 import { advanceBusinessWeek, advanceTechnologyWeek, BUSINESS_WEEK_SECONDS, nextBusinessEventWeek } from './business-cycle';
+import { businessFinanceSummary } from './business-finance';
 import {
   availableNodes, availablePackages, calculateMetrics, createSeries, defaultDesign, defaultTechnology,
   designCaps, getFacilityLevel, inferAudience, resolveProjectIssue, startGeneration, startResearch,
@@ -12,7 +13,7 @@ import {
 } from './manufacturing-system';
 import { activeCompetitorModels, updateCompetitorsWeekly } from './competitor-system';
 import {
-  dismissStaff, financeSummary, giveStaffBonus, hireCandidate, loanOffers, recurringWeeklyBurn, runwayWeeks,
+  dismissStaff, giveStaffBonus, hireCandidate, loanOffers, recurringWeeklyBurn, runwayWeeks,
   takeLoan, upgradeFacility,
 } from './company-system';
 import { trainStaffEnhanced, updateStaffCareer } from './staff-career';
@@ -27,7 +28,7 @@ export {
   activeCompetitorModels, availableNodes, availablePackages, calculateMetrics, cancelContract,
   changeContractCapacity, changeProductAllocation, changeProductPrice, contractFactory, createInitialState,
   createSeries, dateLabel, defaultDesign, defaultTechnology, designCaps, dismissNotification, dismissStaff,
-  endProductNow, financeSummary, getFactoryDefinition, getFacilityLevel, giveStaffBonus, hireCandidate,
+  endProductNow, businessFinanceSummary as financeSummary, getFactoryDefinition, getFacilityLevel, giveStaffBonus, hireCandidate,
   improveProductSupport, inferAudience, launchProduct, loadState, loanOffers, normalizeState, recurringWeeklyBurn,
   releaseProductUpdate, resetState, resolveProjectIssue, runMarketingCampaign, runwayWeeks, saveState,
   startGeneration, startResearch, takeLoan, toggleProjectPause, toggleResearchPause,
