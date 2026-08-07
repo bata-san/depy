@@ -3,7 +3,9 @@ import { box, material, sphere } from './office-primitives';
 import { cityWindowTexture } from './voxel-textures';
 
 const VISUAL_DAY_SECONDS = 12 * 60;
-const CITY_GROUND_Y = -46;
+const CITY_GROUND_Y = -84;
+const blendA = new THREE.Color();
+const blendB = new THREE.Color();
 
 export interface CityLightingSample {
   daylight: number;
@@ -47,10 +49,10 @@ const smooth = (edge0: number, edge1: number, value: number): number => {
 };
 
 function phaseColor(phase: number, dawn: number, day: number, dusk: number, night: number, out: THREE.Color): THREE.Color {
-  if (phase < .25) return out.lerpColors(new THREE.Color(dawn), new THREE.Color(day), smooth(0, .25, phase));
-  if (phase < .5) return out.lerpColors(new THREE.Color(day), new THREE.Color(dusk), smooth(.25, .5, phase));
-  if (phase < .75) return out.lerpColors(new THREE.Color(dusk), new THREE.Color(night), smooth(.5, .75, phase));
-  return out.lerpColors(new THREE.Color(night), new THREE.Color(dawn), smooth(.75, 1, phase));
+  if (phase < .25) return out.lerpColors(blendA.setHex(dawn), blendB.setHex(day), smooth(0, .25, phase));
+  if (phase < .5) return out.lerpColors(blendA.setHex(day), blendB.setHex(dusk), smooth(.25, .5, phase));
+  if (phase < .75) return out.lerpColors(blendA.setHex(dusk), blendB.setHex(night), smooth(.5, .75, phase));
+  return out.lerpColors(blendA.setHex(night), blendB.setHex(dawn), smooth(.75, 1, phase));
 }
 
 export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
@@ -60,7 +62,7 @@ export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
     horizonColor: { value: new THREE.Color(0xe7f3ff) },
   };
   const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(620, 24, 14),
+    new THREE.SphereGeometry(760, 24, 14),
     new THREE.ShaderMaterial({
       side: THREE.BackSide,
       depthWrite: false,
@@ -73,27 +75,27 @@ export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
 
   const sunDiscMaterial = new THREE.MeshBasicMaterial({ color: 0xfff0c3, toneMapped: false, transparent: true, opacity: .95 });
   const moonMaterial = new THREE.MeshBasicMaterial({ color: 0xdde9ff, toneMapped: false, transparent: true, opacity: 0 });
-  const sunDisc = sphere(7.5, sunDiscMaterial, 0, 90, -300);
-  const moon = sphere(5.5, moonMaterial, 0, 80, -320);
+  const sunDisc = sphere(8.5, sunDiscMaterial, 0, 110, -390);
+  const moon = sphere(6.5, moonMaterial, 0, 100, -410);
   sunDisc.castShadow = false;
   moon.castShadow = false;
   scene.add(sunDisc, moon);
 
   const city = new THREE.Group();
   scene.add(city);
-  city.add(box(330, 1.4, 330, material(0x111820, .98), 0, CITY_GROUND_Y - .7, -120));
+  city.add(box(460, 1.8, 460, material(0x111820, .98), 0, CITY_GROUND_Y - .9, -170));
 
   const random = seededRandom(8713);
   const facadePalette = [0x172733, 0x1d3040, 0x243844, 0x1a2b39, 0x2b3e49, 0x203542, 0x293944];
   const lightPalette = [0xffd08a, 0x8fd7ff, 0xffae7a, 0xb9ddff, 0xa8f1d4];
   const specs: BuildingSpec[] = [];
   const layers = [
-    { z: -24, count: 16, span: 90, width: [8, 16] as const, height: [70, 135] as const, depth: [8, 15] as const },
-    { z: -48, count: 19, span: 120, width: [9, 20] as const, height: [85, 165] as const, depth: [9, 18] as const },
-    { z: -82, count: 21, span: 150, width: [11, 25] as const, height: [95, 190] as const, depth: [10, 20] as const },
-    { z: -122, count: 23, span: 180, width: [13, 30] as const, height: [105, 215] as const, depth: [11, 23] as const },
-    { z: -172, count: 25, span: 220, width: [15, 35] as const, height: [120, 245] as const, depth: [12, 26] as const },
-    { z: -232, count: 27, span: 270, width: [17, 42] as const, height: [135, 285] as const, depth: [14, 30] as const },
+    { z: -30, count: 16, span: 120, width: [14, 27] as const, height: [145, 260] as const, depth: [13, 25] as const },
+    { z: -62, count: 19, span: 155, width: [16, 31] as const, height: [160, 290] as const, depth: [15, 28] as const },
+    { z: -105, count: 21, span: 195, width: [18, 36] as const, height: [175, 325] as const, depth: [17, 31] as const },
+    { z: -158, count: 23, span: 235, width: [20, 41] as const, height: [190, 350] as const, depth: [19, 34] as const },
+    { z: -220, count: 25, span: 285, width: [22, 47] as const, height: [205, 385] as const, depth: [21, 38] as const },
+    { z: -295, count: 27, span: 345, width: [25, 54] as const, height: [225, 420] as const, depth: [23, 42] as const },
   ];
 
   layers.forEach((layer, layerIndex) => {
@@ -102,9 +104,9 @@ export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
       const height = layer.height[0] + random() * (layer.height[1] - layer.height[0]);
       const depth = layer.depth[0] + random() * (layer.depth[1] - layer.depth[0]);
       specs.push({
-        x: -layer.span / 2 + index * (layer.span / Math.max(1, layer.count - 1)) + (random() - .5) * (5 + layerIndex * 1.2),
+        x: -layer.span / 2 + index * (layer.span / Math.max(1, layer.count - 1)) + (random() - .5) * (7 + layerIndex * 1.6),
         y: CITY_GROUND_Y + height / 2,
-        z: layer.z - random() * (10 + layerIndex * 3),
+        z: layer.z - random() * (13 + layerIndex * 3.5),
         width,
         height,
         depth,
@@ -115,8 +117,8 @@ export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
   });
 
   const landmarks: Array<[number, number, number, number, number]> = [
-    [-34, -35, 18, 190, 16], [28, -43, 22, 225, 18], [62, -86, 26, 260, 22],
-    [-76, -112, 28, 245, 24], [4, -154, 34, 305, 28], [98, -198, 38, 330, 30],
+    [-42, -42, 28, 310, 24], [36, -58, 32, 350, 27], [78, -112, 38, 395, 32],
+    [-94, -152, 42, 380, 35], [4, -210, 48, 445, 40], [126, -276, 54, 485, 44],
   ];
   landmarks.forEach(([x, z, width, height, depth], index) => specs.push({
     x, y: CITY_GROUND_Y + height / 2, z, width, height, depth,
@@ -163,8 +165,8 @@ export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
   let roofIndex = 0;
   specs.forEach((spec, index) => {
     if (index % 5 !== 0) return;
-    dummy.position.set(spec.x, CITY_GROUND_Y + spec.height + .6, spec.z);
-    dummy.scale.set(.42, .28, .42);
+    dummy.position.set(spec.x, CITY_GROUND_Y + spec.height + .8, spec.z);
+    dummy.scale.set(.5, .34, .5);
     dummy.updateMatrix();
     roofLights.setMatrixAt(roofIndex, dummy.matrix);
     roofIndex += 1;
@@ -174,8 +176,8 @@ export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
   city.add(roofLights);
 
   const horizonMaterial = new THREE.MeshBasicMaterial({ color: 0x9bccec, transparent: true, opacity: .12, depthWrite: false, toneMapped: false });
-  const horizonGlow = new THREE.Mesh(new THREE.PlaneGeometry(380, 120), horizonMaterial);
-  horizonGlow.position.set(0, 18, -300);
+  const horizonGlow = new THREE.Mesh(new THREE.PlaneGeometry(520, 190), horizonMaterial);
+  horizonGlow.position.set(0, 28, -390);
   city.add(horizonGlow);
 
   let elapsed = VISUAL_DAY_SECONDS * .04;
@@ -187,6 +189,17 @@ export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
   const hemiGround = new THREE.Color();
   const fogColor = new THREE.Color();
   const windowFill = new THREE.Color();
+  const sample: CityLightingSample = {
+    daylight: 1,
+    night: 0,
+    sunIntensity: 3,
+    sunColor,
+    hemisphereSky: hemiSky,
+    hemisphereGround: hemiGround,
+    fogColor,
+    windowFill,
+    exposure: 1,
+  };
 
   const update = (delta: number): CityLightingSample => {
     elapsed = (elapsed + delta) % VISUAL_DAY_SECONDS;
@@ -204,8 +217,8 @@ export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
     skyUniforms.horizonColor.value.copy(horizon);
 
     const orbit = phase * Math.PI * 2;
-    sunDisc.position.set(Math.cos(orbit) * 220, 22 + Math.max(-.15, solar) * 170, -300);
-    moon.position.set(-Math.cos(orbit) * 240, 28 + Math.max(-.08, -solar) * 150, -325);
+    sunDisc.position.set(Math.cos(orbit) * 300, 30 + Math.max(-.15, solar) * 220, -390);
+    moon.position.set(-Math.cos(orbit) * 320, 36 + Math.max(-.08, -solar) * 205, -420);
     sunDiscMaterial.opacity = clamp01(daylight * 1.25);
     moonMaterial.opacity = clamp01(night * 1.15);
     windowMaterial.opacity = .12 + night * .88 + twilight * .12;
@@ -218,17 +231,11 @@ export function cityBackdrop(scene: THREE.Scene): CityBackdropController {
     phaseColor(phase, 0x6f8292, 0xa8c1d0, 0x775d63, 0x1a2637, fogColor);
     phaseColor(phase, 0xffc798, 0xb9dcff, 0xff9a78, 0x779cff, windowFill);
 
-    return {
-      daylight,
-      night,
-      sunIntensity: .35 + daylight * 3.15 + twilight * .7,
-      sunColor: sunColor.clone(),
-      hemisphereSky: hemiSky.clone(),
-      hemisphereGround: hemiGround.clone(),
-      fogColor: fogColor.clone(),
-      windowFill: windowFill.clone(),
-      exposure: .88 + daylight * .28 + twilight * .08,
-    };
+    sample.daylight = daylight;
+    sample.night = night;
+    sample.sunIntensity = .35 + daylight * 3.15 + twilight * .7;
+    sample.exposure = .88 + daylight * .28 + twilight * .08;
+    return sample;
   };
 
   return { update };
