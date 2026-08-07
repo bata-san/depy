@@ -4,6 +4,8 @@ import { box, cylinder, emissiveMaterial, joint, material, roundedBox, shadowed,
 const skinPalette = [0xf1c5a2, 0xdfad88, 0xc88e6c, 0xa96f57, 0x805341];
 const hairPalette = [0x12161d, 0x2d201b, 0x5d3b28, 0x775337, 0x353044, 0x8c6a3d];
 const trouserPalette = [0x18242f, 0x202d3a, 0x242837, 0x26362f];
+const contactShadowGeometry = new THREE.CircleGeometry(.47, 24);
+const contactShadowMaterial = new THREE.MeshBasicMaterial({ color: 0x071018, transparent: true, opacity: .24, depthWrite: false });
 
 function tone(color: number, amount: number): number {
   return new THREE.Color(color).multiplyScalar(amount).getHex();
@@ -74,6 +76,13 @@ function addAccessory(root: THREE.Group, chest: THREE.Group, rightHand: THREE.Gr
 export function premiumStaffPerson(color: number, x: number, z: number, rotation = 0, variant = 0): THREE.Group {
   const root = new THREE.Group();
   root.name = 'employee';
+  const contactShadow = new THREE.Mesh(contactShadowGeometry, contactShadowMaterial);
+  contactShadow.name = 'employee-contact-shadow';
+  contactShadow.rotation.x = -Math.PI / 2;
+  contactShadow.position.y = .018;
+  contactShadow.scale.set(1, .62, 1);
+  root.add(contactShadow);
+
   const skin = material(skinPalette[variant % skinPalette.length] ?? 0xf1c5a2, .8, .03);
   const shirt = material(color, .5, .18);
   const shirtDark = material(tone(color, .58), .56, .22);
@@ -117,7 +126,7 @@ export function premiumStaffPerson(color: number, x: number, z: number, rotation
   rightFoot.add(roundedBox(.27, .15, .44, shoes, 0, -.02, .09), box(.27, .035, .45, sole, 0, -.095, .1));
 
   addAccessory(root, chest, rightHand, color, variant);
-  root.traverse((child) => { if (child instanceof THREE.Mesh) shadowed(child, false, false); });
+  root.traverse((child) => { if (child instanceof THREE.Mesh && child !== contactShadow) shadowed(child, false, false); });
   root.position.set(x, 0, z);
   root.rotation.y = rotation;
   root.scale.setScalar(.94 + (variant % 5) * .012);
