@@ -99,19 +99,26 @@ export function inferAudience(metrics: TechnicalMetrics, price: number, series: 
   return candidates.sort((a, b) => b.score - a.score).slice(0, 3).map((entry, index) => ({ ...entry, score: clamp(entry.score / (index ? 1.12 : 1), 0, 100) }));
 }
 
+export function isFoundingProject(state: GameState, project: DevelopmentProject): boolean {
+  return state.stats.generationsLaunched === 0 && state.projects[0]?.id === project.id && project.generation === 1;
+}
+
 function initialCost(metrics: TechnicalMetrics): number { return Math.round(metrics.developmentCost * .28 + 2_200_000); }
 export function startGeneration(state: GameState, seriesId: string, codeName: string, values: DesignValues, technology: TechnologyPlan, leadStaffId: string | null = null): { ok: boolean; message: string; project?: DevelopmentProject } {
   const series = state.series.find((item) => item.id === seriesId);
   if (!series) return { ok: false, message: 'シリーズが見つかりません。' };
   if (state.projects.some((project) => project.seriesId === seriesId && project.stage !== 'ready')) return { ok: false, message: 'このシリーズは開発中です。' };
   if (!availableNodes(state).includes(technology.node) || !availablePackages(state).includes(technology.packageType)) return { ok: false, message: '未解禁技術が含まれています。' };
-  const metrics = calculateMetrics(state, series, values, technology); const cost = initialCost(metrics);
+  const metrics = calculateMetrics(state, series, values, technology);
+  const founding = state.projects.length === 0 && state.stats.generationsLaunched === 0;
+  const cost = founding ? 0 : initialCost(metrics);
   if (state.cash < cost) return { ok: false, message: `着手金が不足しています。必要額 ¥${cost.toLocaleString()}` };
-  state.cash -= cost; addLedger(state, `${series.name}次世代 着手`, -cost, 'development');
+  if (cost > 0) { state.cash -= cost; addLedger(state, `${series.name}次世代 着手`, -cost, 'development'); }
   const generation = series.generation + 1;
-  const project: DevelopmentProject = { id: uid('project'), seriesId, generation, codeName: codeName.trim().slice(0, 28) || `${series.name} Gen ${generation}`, values: { ...values }, technology: { ...technology }, metrics, audience: inferAudience(metrics, metrics.suggestedPrice, series), stage: 'concept', progress: 0, startedAt: { ...state.date }, spent: cost, weeklyBurn: Math.round(220_000 + metrics.complexity * 5_500), paused: false, leadStaffId: leadStaffId ?? state.staff[0]?.id ?? null, issues: [], paidGates: ['concept'], delayWeeks: 0, reliabilityPenalty: 0, performancePenalty: 0 };
+  const project: DevelopmentProject = { id: uid('project'), seriesId, generation, codeName: codeName.trim().slice(0, 28) || `${series.name} Gen ${generation}`, values: { ...values }, technology: { ...technology }, metrics, audience: inferAudience(metrics, metrics.suggestedPrice, series), stage: 'concept', progress: 0, startedAt: { ...state.date }, spent: cost, weeklyBurn: founding ? 0 : Math.round(220_000 + metrics.complexity * 5_500), paused: false, leadStaffId: leadStaffId ?? state.staff[0]?.id ?? null, issues: [], paidGates: ['concept'], delayWeeks: 0, reliabilityPenalty: 0, performancePenalty: 0 };
   state.projects.push(project); state.selectedProjectId = project.id; state.activePanel = 'development';
-  return { ok: true, message: `${project.codeName}の開発を開始しました。`, project };
+  if (founding) addNotice(state, '創業支援開発', '最初の製品開発は着手・試作・検証・ソフト開発・問題修正を含めて無料です。会社運営費のみ発生します。', 'good');
+  return { ok: true, message: founding ? `${project.codeName}の創業支援開発を開始しました。開発費は0円です。` : `${project.codeName}の開発を開始しました。`, project };
 }
 
 function stageFor(progress: number): ProjectStage {
@@ -138,16 +145,17 @@ export function advanceDesignRealtime(state: GameState, deltaSeconds: number, sp
   if (speed === 0) return false;
   let changed = false;
   for (const project of state.projects.filter((item) => item.stage !== 'ready' && !item.paused)) {
+    if (isFoundingProject(state, project)) project.weeklyBurn = 0;
     if (project.issues.some((issue) => issue.status === 'open')) continue;
     const teamFactor = clamp(state.staff.reduce((sum, member) => sum + member.skill * (member.fatigue > 80 ? .55 : 1), 0) / 150, .8, 1.8);
     const gain = deltaSeconds / STANDARD_DEVELOPMENT_SECONDS * 100 * teamFactor;
     const beforeStage = project.stage; project.progress = clamp(project.progress + gain, 0, 100); project.stage = stageFor(project.progress);
     if (project.stage !== beforeStage) {
-      const cost = Math.round(gateCost(project, project.stage));
+      const cost = isFoundingProject(state, project) ? 0 : Math.round(gateCost(project, project.stage));
       if (cost > 0 && !project.paidGates.includes(project.stage)) {
         if (state.cash < cost) { project.paused = true; addNotice(state, '開発停止', `${project.codeName}は${project.stage}工程の費用不足で停止しました。`, 'bad'); }
         else { state.cash -= cost; project.spent += cost; project.paidGates.push(project.stage); addLedger(state, `${project.codeName} ${project.stage}`, -cost, 'development'); }
-      }
+      } else if (!project.paidGates.includes(project.stage)) project.paidGates.push(project.stage);
       if (project.stage !== 'ready' && Math.random() < project.metrics.risk / 260) project.issues.push(createIssue(project));
       if (project.stage === 'ready') { state.stats.generationsLaunched += 1; addNotice(state, '開発完了', `${project.codeName}の量産設計が完成しました。SKUと工場を決めて発売できます。`, 'good'); }
     }
@@ -167,10 +175,14 @@ export function advanceDesignRealtime(state: GameState, deltaSeconds: number, sp
 export function resolveProjectIssue(state: GameState, projectId: string, issueId: string, choice: 'fix' | 'workaround' | 'ignore'): { ok: boolean; message: string } {
   const project = state.projects.find((item) => item.id === projectId); const issue = project?.issues.find((item) => item.id === issueId);
   if (!project || !issue || issue.status !== 'open') return { ok: false, message: '問題が見つかりません。' };
-  if (choice === 'fix') { if (state.cash < issue.fixCost) return { ok: false, message: '修正費が不足しています。' }; state.cash -= issue.fixCost; project.spent += issue.fixCost; addLedger(state, `${project.codeName} 問題修正`, -issue.fixCost, 'development'); }
+  if (choice === 'fix') {
+    const fixCost = isFoundingProject(state, project) ? 0 : issue.fixCost;
+    if (state.cash < fixCost) return { ok: false, message: '修正費が不足しています。' };
+    if (fixCost > 0) { state.cash -= fixCost; project.spent += fixCost; addLedger(state, `${project.codeName} 問題修正`, -fixCost, 'development'); }
+  }
   if (choice === 'workaround') { project.progress = Math.max(0, project.progress - issue.delayWeeks * 1.5); project.performancePenalty += issue.performancePenalty * .45; project.reliabilityPenalty += issue.reliabilityPenalty * .35; }
   if (choice === 'ignore') { project.performancePenalty += issue.performancePenalty; project.reliabilityPenalty += issue.reliabilityPenalty; }
-  issue.status = 'resolved'; return { ok: true, message: choice === 'fix' ? '根本修正しました。' : choice === 'workaround' ? '回避策で開発を継続します。' : 'リスクを受け入れました。' };
+  issue.status = 'resolved'; return { ok: true, message: choice === 'fix' ? (isFoundingProject(state, project) ? '創業支援で無料修正しました。' : '根本修正しました。') : choice === 'workaround' ? '回避策で開発を継続します。' : 'リスクを受け入れました。' };
 }
 export function toggleProjectPause(state: GameState, projectId: string): void { const project = state.projects.find((item) => item.id === projectId); if (project) project.paused = !project.paused; }
 
