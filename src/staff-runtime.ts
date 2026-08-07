@@ -1,4 +1,5 @@
 import { RESEARCH_DEFINITIONS } from './data';
+import { isFoundingProject } from './design-system';
 import { researchDurationSeconds, STANDARD_DEVELOPMENT_SECONDS } from './game-clock';
 import { rewardStaffSuccess, staffPairSynergy, teamChemistry } from './staff-life';
 import { addLedger, addNotice, clamp, uid } from './state';
@@ -89,6 +90,7 @@ export function advanceStaffDrivenRealtime(state: GameState, deltaSeconds: numbe
   const chemistry = teamChemistry(state);
 
   for (const project of state.projects.filter((item) => item.stage !== 'ready' && !item.paused)) {
+    if (isFoundingProject(state, project)) project.weeklyBurn = 0;
     if (project.issues.some((issue) => issue.status === 'open')) continue;
     const staff = projectStaffEffect(state, project);
     const pair = projectPair(state, project);
@@ -99,7 +101,7 @@ export function advanceStaffDrivenRealtime(state: GameState, deltaSeconds: numbe
     project.stage = stageFor(project.progress);
 
     if (project.stage !== beforeStage) {
-      const cost = Math.round(gateCost(project, project.stage));
+      const cost = isFoundingProject(state, project) ? 0 : Math.round(gateCost(project, project.stage));
       if (cost > 0 && !project.paidGates.includes(project.stage)) {
         if (state.cash < cost) {
           project.paused = true;
@@ -110,7 +112,7 @@ export function advanceStaffDrivenRealtime(state: GameState, deltaSeconds: numbe
           project.paidGates.push(project.stage);
           addLedger(state, `${project.codeName} ${project.stage}`, -cost, 'development');
         }
-      }
+      } else if (!project.paidGates.includes(project.stage)) project.paidGates.push(project.stage);
 
       applyStageCraft(state, project, project.stage, staff.quality, staff.leadName, pair.synergy);
       if (pair.lead) pair.lead.xp += 2.5 + pair.synergy / 55;

@@ -16,148 +16,186 @@ export interface OfficeLifeDetails {
   update: (time: number, state: OfficeLifeDetailState) => void;
 }
 
-function paperStack(x: number, z: number, height = .08): THREE.Group {
+function snackBar(): THREE.Group {
   const group = new THREE.Group();
-  const paper = material(0xf2efe6, .92, 0);
-  const ink = material(0x5d7483, .88, 0);
-  for (let i = 0; i < 4; i += 1) group.add(box(.34, .018, .25, i === 2 ? ink : paper, x + i * .006, .82 + i * .018 + height, z - i * .004));
+  const body = material(0x1d2b34, .48, .38);
+  const steel = material(0x566b76, .28, .66);
+  group.add(roundedBox(1.6, .92, .7, body, 7.7, .5, 5.55));
+  group.add(roundedBox(.5, .72, .48, steel, 7.4, 1.18, 5.52));
+  group.add(box(.32, .16, .03, emissiveMaterial(0x17242c, 0xffb460, .72), 7.4, 1.28, 5.27));
+  group.add(cylinder(.11, .24, material(0xe6e9e8, .68, .04), 8.0, 1.05, 5.5, 16));
+  group.add(box(.78, .06, .38, material(0x75553d, .62, .08), 8.0, .98, 5.55));
   return group;
 }
 
-function coffeeCorner(): THREE.Group {
+function projectBoard(): THREE.Group {
   const group = new THREE.Group();
-  const steel = material(0x2b3942, .34, .62);
-  const dark = material(0x11191f, .6, .35);
-  const warm = emissiveMaterial(0x34271d, 0xffa85d, .5);
-  group.add(roundedBox(1.35, .9, .62, material(0x24323a, .75, .12), 6.35, .48, 4.72));
-  group.add(roundedBox(.48, .68, .42, steel, 6.1, 1.16, 4.71));
-  group.add(box(.3, .16, .07, warm, 6.1, 1.26, 4.48));
-  group.add(cylinder(.09, .22, dark, 6.1, .89, 4.5, 10));
-  group.add(cylinder(.12, .2, material(0xe7e4dd, .78, .02), 6.65, .98, 4.65, 12));
-  group.add(box(.6, .06, .35, material(0xb98b5b, .7, .04), 6.72, .95, 4.69));
-  return group;
-}
-
-function wallFrames(): THREE.Group {
-  const group = new THREE.Group();
-  const frame = material(0x202b32, .48, .35);
-  const colors = [0x5bb4ff, 0xffad65, 0x6fe0ad, 0xc391ff];
-  [-3.4, -2.25, -1.1, .05].forEach((x, index) => {
-    group.add(box(.85, .58, .07, frame, x, 3.9, -5.82));
-    group.add(box(.7, .43, .018, emissiveMaterial(0x162332, colors[index] ?? 0xffffff, .28), x, 3.9, -5.775));
-  });
-  return group;
-}
-
-function floorWayfinding(): THREE.Group {
-  const group = new THREE.Group();
-  const path = material(0x315465, .88, .02);
-  const accent = material(0x457b8b, .85, .02);
-  for (let z = -4.1; z <= 3.8; z += .72) group.add(box(.12, .015, .4, path, .95, .04, z));
-  for (let x = -6.1; x <= 5.9; x += .8) group.add(box(.38, .015, .1, accent, x, .04, .72));
-  return group;
-}
-
-function trophyShelf(): { group: THREE.Group; trophyGlow: THREE.Mesh[] } {
-  const group = new THREE.Group();
-  const shelf = material(0x1d2b34, .5, .48);
-  const gold = material(0xd7a64f, .3, .5);
-  const glow = emissiveMaterial(0x2a2417, 0xffc45e, .65);
-  const trophyGlow: THREE.Mesh[] = [];
-  group.add(box(2.35, .1, .42, shelf, 3.15, 2.05, -5.45), box(2.35, .1, .42, shelf, 3.15, 3.02, -5.45));
-  [2.55, 3.15, 3.75].forEach((x, index) => {
-    group.add(cylinder(.13, .18, gold, x, 2.25, -5.42, 10));
-    group.add(box(.28, .26, .2, gold, x, 2.47, -5.42));
-    const light = sphere(.055, glow, x, 2.75, -5.38);
-    light.name = `trophy-glow-${index}`;
-    trophyGlow.push(light);
-    group.add(light);
-  });
-  return { group, trophyGlow };
-}
-
-function projectWarRoom(): THREE.Group {
-  const group = new THREE.Group();
-  const board = material(0xd9e3e6, .78, .02);
-  const trim = material(0x334853, .42, .5);
-  group.add(box(2.55, 1.45, .08, trim, -1.0, 2.75, 5.46));
-  group.add(box(2.35, 1.25, .035, board, -1.0, 2.75, 5.4));
-  const noteColors = [0x70c8ff, 0xffc46a, 0x75d8a5, 0xea8fa9];
-  for (let i = 0; i < 12; i += 1) {
-    const x = -1.92 + (i % 4) * .57;
-    const y = 2.32 + Math.floor(i / 4) * .4;
-    group.add(box(.34, .22, .012, material(noteColors[i % noteColors.length] ?? 0xffffff, .86, 0), x, y, 5.36));
+  group.add(roundedBox(3.2, 1.8, .09, material(0x1a2831, .42, .52), -1.0, 3.7, 6.64));
+  group.add(box(3.0, 1.58, .025, material(0xdde7e9, .8, .02), -1.0, 3.7, 6.57));
+  const notes = [0x69caff, 0xffbe67, 0x72dea9, 0xc68fff];
+  for (let index = 0; index < 18; index += 1) {
+    const x = -2.15 + (index % 6) * .46;
+    const y = 3.14 + Math.floor(index / 6) * .48;
+    const note = roundedBox(.31, .22, .014, material(notes[index % notes.length] ?? 0xffffff, .82, .02), x, y, 6.54);
+    note.rotation.z = ((index % 3) - 1) * .025;
+    group.add(note);
   }
   return group;
 }
 
-function crateCluster(): THREE.Group {
+function achievementWall(): { group: THREE.Group; lights: THREE.Mesh[] } {
   const group = new THREE.Group();
-  const cardboard = material(0x8b6847, .92, .01);
-  const tape = material(0xcaa16a, .8, .01);
-  const crates: Array<[number, number, number]> = [[7.0, 4.65, .55], [6.45, 4.95, .4], [7.15, 4.15, .34]];
-  crates.forEach(([x, z, s], index) => {
-    group.add(roundedBox(s, s * .72, s, cardboard, x, s * .36, z));
-    group.add(box(.06, s * .73, s * 1.01, tape, x + (index % 2 ? .08 : -.06), s * .36, z));
-  });
-  return group;
+  group.add(roundedBox(3.2, 1.85, .12, material(0x16242c, .42, .56), 4.9, 3.65, 6.62));
+  const lights: THREE.Mesh[] = [];
+  for (let index = 0; index < 6; index += 1) {
+    const x = 3.72 + (index % 3) * 1.18;
+    const y = 3.18 + Math.floor(index / 3) * .78;
+    group.add(roundedBox(.8, .5, .035, material(0x293b45, .34, .48), x, y, 6.53));
+    group.add(cylinder(.11, .2, material(0xc79c4b, .3, .52), x, y, 6.48, 12));
+    const light = sphere(.05, emissiveMaterial(0x241e15, 0xffc35a, .25), x, y + .18, 6.44);
+    lights.push(light); group.add(light);
+  }
+  return { group, lights };
+}
+
+function progressRail(): { group: THREE.Group; nodes: THREE.Mesh[] } {
+  const group = new THREE.Group();
+  const nodes: THREE.Mesh[] = [];
+  const base = material(0x24343d, .38, .56);
+  group.add(roundedBox(5.8, .08, .18, base, -3.65, .18, .55));
+  for (let index = 0; index < 5; index += 1) {
+    const x = -6.15 + index * 1.25;
+    const node = cylinder(.12, .08, emissiveMaterial(0x18262d, 0x61cfff, .16), x, .22, .55, 16);
+    nodes.push(node); group.add(node);
+  }
+  return { group, nodes };
+}
+
+function researchOrbit(): { group: THREE.Group; satellites: THREE.Mesh[]; core: THREE.Mesh } {
+  const group = new THREE.Group(); group.position.set(-5.1, 2.7, 3.9);
+  const core = sphere(.11, emissiveMaterial(0x10242e, 0x61e5ff, .6)); group.add(core);
+  const satellites: THREE.Mesh[] = [];
+  for (let index = 0; index < 4; index += 1) {
+    const satellite = sphere(.045, emissiveMaterial(0x17242d, index % 2 ? 0x9b83ff : 0x61e5ff, .42));
+    satellites.push(satellite); group.add(satellite);
+  }
+  return { group, satellites, core };
+}
+
+function launchRings(): { group: THREE.Group; rings: THREE.Mesh[] } {
+  const group = new THREE.Group(); group.position.set(5, .42, 3.8);
+  const rings: THREE.Mesh[] = [];
+  for (let index = 0; index < 3; index += 1) {
+    const geometry = new THREE.TorusGeometry(.75 + index * .23, .018, 8, 40);
+    const ring = new THREE.Mesh(geometry, emissiveMaterial(0x17242d, index % 2 ? 0xffb15f : 0x61cfff, .22));
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = index * .13;
+    rings.push(ring); group.add(ring);
+  }
+  return { group, rings };
+}
+
+function ideaParticles(): { group: THREE.Group; particles: THREE.Mesh[] } {
+  const group = new THREE.Group();
+  const particles: THREE.Mesh[] = [];
+  for (let index = 0; index < 12; index += 1) {
+    const mesh = sphere(.035 + (index % 3) * .008, emissiveMaterial(0x17252d, index % 3 === 0 ? 0xffc26a : 0x63d6ff, .32));
+    mesh.position.set(-6.2 + index % 6 * 1.1, 1.3 + Math.floor(index / 6) * .35, -4.8 + index % 4 * 1.25);
+    mesh.userData.baseY = mesh.position.y;
+    mesh.userData.phase = index * .73;
+    particles.push(mesh); group.add(mesh);
+  }
+  return { group, particles };
+}
+
+function floorPulse(): THREE.Mesh[] {
+  const strips: THREE.Mesh[] = [];
+  const xs = [-6.4, -3.2, 0, 3.2, 6.4];
+  xs.forEach((x) => strips.push(box(1.8, .012, .04, emissiveMaterial(0x17242d, 0x5ed1ff, .12), x, .12, -.05)));
+  return strips;
 }
 
 export function buildOfficeLifeDetails(office: THREE.Group): OfficeLifeDetails {
-  const everyday = new THREE.Group();
-  everyday.name = 'office-life-everyday';
-  everyday.add(coffeeCorner(), wallFrames(), floorWayfinding(), projectWarRoom(), crateCluster());
-  everyday.add(paperStack(-5.15, -3.7), paperStack(-2.25, -1.3, .03), paperStack(2.3, -3.75, .01));
+  const everyday = new THREE.Group(); everyday.name = 'premium-office-feedback';
+  everyday.add(snackBar(), projectBoard());
+  const achievement = achievementWall(); everyday.add(achievement.group);
+  const progress = progressRail(); everyday.add(progress.group);
+  const research = researchOrbit(); everyday.add(research.group);
+  const launch = launchRings(); everyday.add(launch.group);
+  const ideas = ideaParticles(); everyday.add(ideas.group);
+  const pulseStrips = floorPulse(); pulseStrips.forEach((mesh) => everyday.add(mesh));
 
-  const bins = new THREE.Group();
-  const bin = material(0x24343d, .72, .16);
-  const recycle = material(0x315e68, .75, .08);
-  bins.add(roundedBox(.4, .58, .4, bin, -7.0, .3, -4.55), roundedBox(.4, .58, .4, recycle, -6.5, .3, -4.55));
-  everyday.add(bins);
-
-  const trophies = trophyShelf();
-  everyday.add(trophies.group);
-  office.add(everyday);
-
-  const prestige = new THREE.Group();
-  prestige.name = 'office-life-prestige';
-  const sculpture = material(0x697f8d, .28, .62);
-  prestige.add(cylinder(.55, .16, material(0x202c33, .45, .4), 0, .12, 4.65, 16));
-  prestige.add(sphere(.38, sculpture, 0, .62, 4.65));
-  prestige.add(box(.08, .82, .08, material(0xa7bac4, .25, .58), 0, .55, 4.65));
-  office.add(prestige);
-
-  const statusLamps = [
-    emissiveMaterial(0x15252d, 0x5dc8ff, .45),
-    emissiveMaterial(0x17271f, 0x61dfa0, .45),
-    emissiveMaterial(0x2b2117, 0xffbd63, .45),
-  ];
-  const statusMeshes: THREE.Mesh[] = statusLamps.map((mat, index) => box(.36, .08, .08, mat, -6.1 + index * .46, 4.55, -5.72));
-  statusMeshes.forEach((mesh) => everyday.add(mesh));
+  const prestige = new THREE.Group(); prestige.name = 'office-prestige';
+  prestige.add(cylinder(.7, .18, material(0x1c2930, .4, .5), 0, .18, 5.6, 20));
+  prestige.add(sphere(.42, material(0x7f96a2, .22, .72), 0, .78, 5.6));
+  prestige.add(box(.08, 1.0, .08, material(0xa8bcc5, .24, .66), 0, .7, 5.6));
+  everyday.add(prestige);
 
   const nightLights: THREE.Mesh[] = [];
-  [-5.9, -2.9, .1, 3.1, 6.1].forEach((x) => {
-    const lamp = box(.58, .035, .18, emissiveMaterial(0x1c2630, 0x82c9ff, .3), x, 4.72, 4.88);
-    nightLights.push(lamp);
-    everyday.add(lamp);
-  });
+  for (const x of [-7.4, -4.8, -2.2, .4, 3.0, 5.6, 8.0]) {
+    const lamp = roundedBox(.8, .04, .16, emissiveMaterial(0x1a252c, 0x86d3ff, .22), x, 4.85, 5.95);
+    nightLights.push(lamp); everyday.add(lamp);
+  }
+
+  office.add(everyday);
+  let previousProductGlow = 0;
+  let celebrationUntil = 0;
 
   return {
     update(time, state) {
-      prestige.visible = state.officeLevel >= 4;
-      trophies.group.visible = state.officeLevel >= 2 || state.productGlow > .45;
       const occupied = state.totalStaff ? state.presentStaff / state.totalStaff : 0;
+      prestige.visible = state.officeLevel >= 4;
+      achievement.group.visible = state.officeLevel >= 2 || state.productGlow > .32;
+
+      progress.nodes.forEach((node, index) => {
+        if (!(node.material instanceof THREE.MeshStandardMaterial)) return;
+        const unlocked = state.projectProgress >= index * 25;
+        node.material.emissiveIntensity = unlocked ? .65 + Math.sin(time * 2.4 + index) * .12 : .08;
+        node.scale.setScalar(unlocked ? 1 + Math.sin(time * 2 + index) * .04 : .82);
+      });
+
+      research.group.visible = state.researchActive;
+      research.core.scale.setScalar(1 + Math.sin(time * 3.2) * .12);
+      if (research.core.material instanceof THREE.MeshStandardMaterial) research.core.material.emissiveIntensity = state.researchActive ? 1.1 + Math.sin(time * 4) * .3 : .1;
+      research.satellites.forEach((satellite, index) => {
+        const angle = time * (1.2 + index * .13) + index * Math.PI * .5;
+        const radius = .34 + index * .055;
+        satellite.position.set(Math.cos(angle) * radius, Math.sin(time * 1.7 + index) * .08, Math.sin(angle) * radius);
+      });
+
+      if (state.productGlow > previousProductGlow + .08 && state.productGlow > .55) celebrationUntil = time + 6;
+      previousProductGlow = state.productGlow;
+      const celebrating = time < celebrationUntil;
+      launch.group.visible = state.productGlow > .22 || celebrating;
+      launch.rings.forEach((ring, index) => {
+        ring.rotation.z += .004 + state.productGlow * .01 + index * .001;
+        ring.scale.setScalar(1 + Math.sin(time * 2.2 + index) * (.025 + state.productGlow * .03));
+        if (ring.material instanceof THREE.MeshStandardMaterial) ring.material.emissiveIntensity = .2 + state.productGlow * 1.2 + (celebrating ? .8 : 0);
+      });
+
+      ideas.particles.forEach((particle, index) => {
+        const phase = Number(particle.userData.phase ?? index);
+        particle.position.y = Number(particle.userData.baseY ?? 1.4) + Math.sin(time * (1.1 + index % 3 * .2) + phase) * .18;
+        particle.visible = state.presentStaff > index % Math.max(1, state.totalStaff) && (state.projectProgress > 0 || state.researchActive);
+        if (particle.material instanceof THREE.MeshStandardMaterial) particle.material.emissiveIntensity = .2 + state.projectProgress / 100 * .45 + (state.researchActive ? .35 : 0);
+      });
+
+      achievement.lights.forEach((light, index) => {
+        if (!(light.material instanceof THREE.MeshStandardMaterial)) return;
+        const earned = state.officeLevel + Math.round(state.productGlow * 3) > index;
+        light.material.emissiveIntensity = earned ? .55 + state.productGlow * .9 + Math.sin(time * 2.3 + index) * .1 : .04;
+      });
+
+      pulseStrips.forEach((strip, index) => {
+        if (!(strip.material instanceof THREE.MeshStandardMaterial)) return;
+        strip.material.emissiveIntensity = .08 + occupied * .2 + Math.max(0, Math.sin(time * 1.8 - index * .7)) * (.12 + state.projectProgress / 100 * .2);
+      });
+
       nightLights.forEach((mesh, index) => {
-        if (mesh.material instanceof THREE.MeshStandardMaterial) mesh.material.emissiveIntensity = .18 + state.night * (.62 + occupied * .55) + Math.sin(time * 1.2 + index) * .03;
+        if (mesh.material instanceof THREE.MeshStandardMaterial) mesh.material.emissiveIntensity = .12 + state.night * (.55 + occupied * .6) + Math.sin(time * 1.1 + index) * .025;
       });
-      statusMeshes.forEach((mesh, index) => {
-        if (!(mesh.material instanceof THREE.MeshStandardMaterial)) return;
-        const target = index === 0 ? state.projectProgress / 100 : index === 1 ? state.cashHealth : state.researchActive ? 1 : .25;
-        mesh.material.emissiveIntensity = .25 + target * 1.1;
-      });
-      trophies.trophyGlow.forEach((mesh, index) => {
-        if (mesh.material instanceof THREE.MeshStandardMaterial) mesh.material.emissiveIntensity = .22 + state.productGlow * 1.3 + Math.sin(time * 2.3 + index) * .08;
-      });
+
+      everyday.rotation.y = celebrating ? Math.sin(time * 18) * .0006 : 0;
     },
   };
 }
