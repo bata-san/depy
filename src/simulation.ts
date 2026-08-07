@@ -11,7 +11,9 @@ import {
   endProductNow, getFactoryDefinition, improveProductSupport, launchProduct, releaseProductUpdate,
   runMarketingCampaign,
 } from './manufacturing-system';
-import { improveFactoryLine, serviceFactoryLine } from './factory-operations';
+import {
+  expandFactoryLine, factoryMaximumCapacity, getFactoryLineSnapshot, improveFactoryLine, serviceFactoryLine,
+} from './factory-operations';
 import { activeCompetitorModels, updateCompetitorsWeekly } from './competitor-system';
 import {
   dismissStaff, giveStaffBonus, hireCandidate, loanOffers, recurringWeeklyBurn, runwayWeeks,
@@ -29,7 +31,8 @@ export {
   activeCompetitorModels, availableNodes, availablePackages, calculateMetrics, cancelContract,
   changeContractCapacity, changeProductAllocation, changeProductPrice, contractFactory, createInitialState,
   createSeries, dateLabel, defaultDesign, defaultTechnology, designCaps, dismissNotification, dismissStaff,
-  endProductNow, businessFinanceSummary as financeSummary, getFactoryDefinition, getFacilityLevel, giveStaffBonus, hireCandidate,
+  endProductNow, businessFinanceSummary as financeSummary, expandFactoryLine, factoryMaximumCapacity,
+  getFactoryDefinition, getFactoryLineSnapshot, getFacilityLevel, giveStaffBonus, hireCandidate,
   improveFactoryLine, improveProductSupport, inferAudience, launchProduct, loadState, loanOffers, normalizeState, recurringWeeklyBurn,
   releaseProductUpdate, resetState, resolveProjectIssue, runMarketingCampaign, runwayWeeks, saveState,
   serviceFactoryLine, staffCapacity, startGeneration, startResearch, takeLoan, toggleProjectPause, toggleResearchPause,
