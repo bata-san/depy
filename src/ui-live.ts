@@ -1,7 +1,8 @@
-import { ROLE_LABELS } from './data';
+import { ROLE_LABELS, SPECIALTY_LABELS, TRAIT_LABELS } from './data';
 import { businessDateLabel } from './business-cycle';
 import { operationsStaffEffect, projectStaffEffect, researchStaffEffect, salesStaffEffect } from './staff-effects';
 import type { GameState, ProjectStage } from './types';
+import { esc } from './ui-format';
 
 const stages: Record<ProjectStage, string> = {
   concept: '企画', architecture: '詳細設計', tapeout: 'テープアウト', prototype: '試作', validation: '検証', ready: '完成',
@@ -28,7 +29,19 @@ function ensureLiveLine(parent: HTMLElement, className: string): HTMLElement {
   return node;
 }
 
+function pulseBusinessWeek(root: HTMLElement, state: GameState): void {
+  const current = String(state.absoluteWeek);
+  if (root.dataset.businessWeek === current) return;
+  root.dataset.businessWeek = current;
+  root.classList.remove('business-tick');
+  requestAnimationFrame(() => {
+    root.classList.add('business-tick');
+    window.setTimeout(() => root.classList.remove('business-tick'), 420);
+  });
+}
+
 function updateHud(root: HTMLElement, state: GameState): void {
+  pulseBusinessWeek(root, state);
   const stats = root.querySelectorAll<HTMLElement>('.top-hud .hud-stat');
   const business = stats[0];
   if (business) {
@@ -98,8 +111,7 @@ function updateProducts(root: HTMLElement, state: GameState): void {
     }
     if (hero[2]) setText(hero[2].querySelector('b'), lost.toLocaleString());
     if (hero[3]) setText(hero[3].querySelector('b'), yen.format(product.weeklyProfit));
-    const rating = card.querySelector<HTMLElement>('.rating b');
-    if (rating) setText(rating, product.rating.toFixed(1));
+    setText(card.querySelector('.rating b'), product.rating.toFixed(1));
   });
 
   const panel = root.querySelector<HTMLElement>('.product-list')?.closest<HTMLElement>('.panel-section');
@@ -122,11 +134,99 @@ function updateProducts(root: HTMLElement, state: GameState): void {
   }
 }
 
+function updateFactories(root: HTMLElement, state: GameState): void {
+  const active = state.contracts.filter((contract) => contract.active);
+  const cards = root.querySelectorAll<HTMLElement>('.factory-list > .factory-card');
+  cards.forEach((card, index) => {
+    const contract = active[index];
+    if (!contract) return;
+    const badge = card.querySelector<HTMLElement>('header .badge');
+    if (badge) {
+      setText(badge, contract.setupRemaining ? '立上げ中' : '稼働中');
+      badge.classList.toggle('warning', contract.setupRemaining > 0);
+      badge.classList.toggle('good', contract.setupRemaining === 0);
+    }
+    setText(card.querySelector('header > b'), `${contract.committedCapacity.toLocaleString()} / 5秒`);
+    const metrics = card.querySelectorAll<HTMLElement>('.metric-quad > div');
+    setText(metrics[3]?.querySelector('b') ?? null, `${contract.remainingWeeks}経営週`);
+  });
+}
+
+function updateStaff(root: HTMLElement, state: GameState): void {
+  const cards = root.querySelectorAll<HTMLElement>('.staff-grid > .staff-card');
+  cards.forEach((card, index) => {
+    const member = state.staff[index];
+    if (!member) return;
+    setText(card.querySelector('header p'), `${SPECIALTY_LABELS[member.specialty]} · Lv.${member.level}`);
+    const core = card.querySelectorAll<HTMLElement>('.staff-core-stats span b');
+    setText(core[0] ?? null, String(Math.round(member.skill)));
+    setText(core[1] ?? null, String(Math.round(member.creativity)));
+    setText(core[2] ?? null, String(Math.round(member.discipline)));
+    setText(core[3] ?? null, String(Math.round(member.growth)));
+    const bars = card.querySelectorAll<HTMLElement>('.staff-bars label');
+    const values = [member.morale, member.fatigue, member.loyalty, Math.min(80, member.xp)];
+    bars.forEach((label, barIndex) => {
+      const value = values[barIndex] ?? 0;
+      setText(label.querySelector('b'), String(Math.round(value)));
+      setMeter(label.querySelector('.meter i'), barIndex === 3 ? value / 80 * 100 : value);
+    });
+    const traitRow = card.querySelector<HTMLElement>('.trait-row');
+    if (traitRow) {
+      const html = member.traits.map((trait) => `<span>${esc(TRAIT_LABELS[trait])}</span>`).join('');
+      if (traitRow.innerHTML !== html) traitRow.innerHTML = html;
+    }
+  });
+
+  const teamPower = root.querySelectorAll<HTMLElement>('.team-power-strip > div b');
+  if (teamPower.length >= 3) {
+    const projects = state.projects.filter((project) => project.stage !== 'ready');
+    const engineering = projects.length ? projectStaffEffect(state, projects[0]!).speed : 1;
+    setText(teamPower[0] ?? null, `×${engineering.toFixed(2)}`);
+    setText(teamPower[1] ?? null, `×${salesStaffEffect(state).toFixed(2)}`);
+    setText(teamPower[2] ?? null, `×${operationsStaffEffect(state).toFixed(2)}`);
+  }
+
+  const candidates = root.querySelectorAll<HTMLElement>('.candidate-grid > .candidate-card');
+  candidates.forEach((card, index) => {
+    const candidate = state.candidates[index];
+    if (!candidate) return;
+    const footer = card.querySelector<HTMLElement>('footer > span');
+    setText(footer, `${yen.format(candidate.salary)}/月 · 残り${Math.max(0, candidate.expiresAtWeek - state.absoluteWeek)}経営週`);
+  });
+}
+
+function updateFinance(root: HTMLElement, state: GameState): void {
+  const hero = root.querySelectorAll<HTMLElement>('.finance-hero > div');
+  if (hero[0]) setText(hero[0].querySelector('b'), yen.format(state.cash));
+  const loans = root.querySelectorAll<HTMLElement>('.active-loans > .card');
+  loans.forEach((card, index) => {
+    const loan = state.loans[index];
+    if (!loan) return;
+    setText(card.querySelector('h3'), `残高 ${yen.format(loan.balance)}`);
+    setText(card.querySelector('header > b'), `残り${loan.remainingWeeks}経営週`);
+    setMeter(card.querySelector('.meter i'), loan.balance / Math.max(1, loan.principal * (1 + loan.interestRate)) * 100);
+  });
+}
+
+function updateNotifications(root: HTMLElement, state: GameState): void {
+  const rail = root.querySelector<HTMLElement>('.notification-rail');
+  if (!rail) return;
+  const wanted = state.notifications.slice(0, 3);
+  const currentIds = [...rail.querySelectorAll<HTMLElement>('[data-action="dismiss-notice"]')].map((button) => button.dataset.id ?? '').join('|');
+  const wantedIds = wanted.map((item) => item.id).join('|');
+  if (currentIds === wantedIds) return;
+  rail.innerHTML = wanted.map((item) => `<article class="notice ${item.tone}"><span></span><div><b>${esc(item.title)}</b><p>${esc(item.message)}</p></div><button data-action="dismiss-notice" data-id="${item.id}">×</button></article>`).join('');
+}
+
 export function updateRealtimeUI(root: HTMLElement, state: GameState): void {
   updateHud(root, state);
   updateProjects(root, state);
   updateResearch(root, state);
   updateProducts(root, state);
+  updateFactories(root, state);
+  updateStaff(root, state);
+  updateFinance(root, state);
+  updateNotifications(root, state);
 }
 
 export function realtimeStructureKey(state: GameState): string {
@@ -135,5 +235,7 @@ export function realtimeStructureKey(state: GameState): string {
   const research = state.activeResearch ? `${state.activeResearch.area}:${state.activeResearch.paused}` : 'none';
   const event = state.activeEvent?.id ?? 'none';
   const candidates = state.candidates.map((candidate) => candidate.id).join(',');
-  return `${projects}#research:${research}#products:${products}#event:${event}#candidates:${candidates}#staff:${state.staff.length}#notices:${state.notifications.length}`;
+  const competitors = state.competitors.map((company) => `${company.id}:${company.status}:${company.models.length}`).join(',');
+  const loans = state.loans.map((loan) => loan.id).join(',');
+  return `${projects}#research:${research}#products:${products}#event:${event}#candidates:${candidates}#staff:${state.staff.length}#rivals:${competitors}#loans:${loans}#market:${state.market.headline}`;
 }
