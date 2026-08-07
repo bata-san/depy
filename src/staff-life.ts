@@ -109,17 +109,11 @@ export function teamChemistry(state: GameState): number {
   return clamp(teamwork * .48 + morale * .3 + roles * 3.1 + communicator - fatigue * .12);
 }
 
-/**
- * Business time advances every few real seconds, so condition values must not be
- * treated as literal week-by-week additive damage. Instead each update eases the
- * employee toward a sustainable target. This prevents a normal team from racing
- * to fatigue 100 / morale 0 while still making long heavy workloads visible.
- */
+/** Fast business weeks ease conditions toward a sustainable target instead of adding damage forever. */
 export function staffWeeklyConditionDelta(member: StaffMember, workload: number, chemistry: number): { fatigue: number; morale: number; xp: number } {
   const profile = staffLifeProfile(member);
   const workloadPressure = clamp(Math.max(0, workload), 0, 4);
   const resilience = profile.resilience / 100;
-
   const targetFatigue = clamp(
     20 + workloadPressure * 12 - resilience * 10
       + (member.traits.includes('workhorse') ? -6 : 0)
@@ -147,6 +141,39 @@ export function staffWeeklyConditionDelta(member: StaffMember, workload: number,
 
   const xp = workloadPressure > .05 ? .45 + workloadPressure * .22 + profile.ambition / 180 : .08;
   return { fatigue, morale, xp };
+}
+
+/** Called once when the office becomes empty and the visual clock skips to the next morning. */
+export function recoverStaffAfterWorkday(state: GameState): void {
+  for (const member of state.staff) {
+    const profile = staffLifeProfile(member);
+    const emergencyRecovery = member.fatigue >= 90 ? 24 : member.fatigue >= 75 ? 16 : 0;
+    const normalRecovery = 7 + profile.resilience * .07 + (member.traits.includes('workhorse') ? 2 : 0);
+    member.fatigue = clamp(member.fatigue - normalRecovery - emergencyRecovery, 0, 100);
+
+    const moraleRecovery = member.morale <= 10 ? 13 : member.morale <= 30 ? 7 : member.fatigue < 45 ? 1.2 : .4;
+    member.morale = clamp(member.morale + moraleRecovery, 0, 100);
+
+    // Loyalty changes much more slowly than mood. A stable day gently repairs previously collapsed saves.
+    const loyaltyRecovery = member.loyalty <= 10 ? 5 : member.loyalty <= 30 ? 2.2 : member.morale >= 70 ? .35 : .08;
+    member.loyalty = clamp(member.loyalty + loyaltyRecovery, 0, 100);
+  }
+}
+
+export function rewardStaffSuccess(
+  state: GameState,
+  amount: number,
+  roles?: StaffRole[],
+  fatigueRelief = 0,
+): void {
+  for (const member of state.staff) {
+    if (roles && !roles.includes(member.role)) continue;
+    const profile = staffLifeProfile(member);
+    const personal = amount * (.8 + profile.ambition / 250 + profile.teamwork / 400);
+    member.morale = clamp(member.morale + personal, 0, 100);
+    member.loyalty = clamp(member.loyalty + amount * .12, 0, 100);
+    if (fatigueRelief > 0) member.fatigue = clamp(member.fatigue - fatigueRelief, 0, 100);
+  }
 }
 
 export function staffPairSynergy(a: StaffLifeInput, b: StaffLifeInput): number {
