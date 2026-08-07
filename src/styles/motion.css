@@ -1,0 +1,7 @@
+#ui-root.business-tick [data-hud-business], #ui-root.business-tick [data-hud-cash], #ui-root.business-tick [data-hud-progress], #ui-root.business-tick [data-product-sales], #ui-root.business-tick [data-summary-sales] { animation: valueTick .32s cubic-bezier(.2,.8,.2,1); }
+@keyframes valueTick { 0% { opacity: .58; transform: translateY(2px); } 48% { opacity: 1; transform: translateY(-1px); text-shadow: 0 0 12px rgba(110,212,255,.82), var(--shadow-text); } 100% { opacity: 1; transform: none; } }
+.tool-window:not([hidden]) { animation: toolEnter .16s ease-out; }
+@keyframes toolEnter { from { opacity: 0; transform: translateX(9px); } }
+.decision-sheet { animation: decisionEnter .18s ease-out; }
+@keyframes decisionEnter { from { opacity: 0; transform: translateY(8px); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }

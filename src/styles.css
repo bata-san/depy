@@ -1,7 +1,6 @@
-@import './styles/base.css';
-@import './styles/hud.css';
-@import './styles/panels.css';
-@import './styles/game.css';
+@import './styles/foundation.css';
+@import './styles/interface.css';
+@import './styles/views.css';
+@import './styles/toasts.css';
 @import './styles/save.css';
-@import './styles/modern.css';
-@import './styles/live.css';
+@import './styles/motion.css';

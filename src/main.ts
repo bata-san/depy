@@ -3,190 +3,76 @@ import { createOfficeScene, type OfficeScene } from './office';
 import { openSaveScreen } from './save-screen';
 import { advanceRealtime, advanceWeek, createInitialState, normalizeState, saveState } from './simulation';
 import type { GameState, PanelId } from './types';
-import { GameUI } from './ui';
-import { realtimeStructureKey, updateRealtimeUI } from './ui-live';
+import { InterfaceController } from './interface/controller';
 
 const app = document.querySelector<HTMLElement>('#app');
 if (!app) throw new Error('#app was not found');
 
-app.innerHTML = `
-  <main class="app-shell" aria-label="PC Frontier Lab">
-    <div id="office-canvas" class="office-canvas" aria-hidden="true"></div>
-    <div id="office-hotspots" class="office-hotspots"></div>
-    <div id="ui-root"></div>
-  </main>
-`;
+app.innerHTML = `<main class="app-shell" aria-label="PC Frontier Lab"><div id="office-canvas" class="office-canvas" aria-hidden="true"></div><div id="office-hotspots" class="office-hotspots"></div><div id="ui-root"></div></main>`;
 
-const uiRootCandidate = document.querySelector<HTMLElement>('#ui-root');
-const canvasHostCandidate = document.querySelector<HTMLElement>('#office-canvas');
-const hotspotHostCandidate = document.querySelector<HTMLElement>('#office-hotspots');
-if (!uiRootCandidate || !canvasHostCandidate || !hotspotHostCandidate) throw new Error('Application hosts were not created');
-const uiRoot: HTMLElement = uiRootCandidate;
-const canvasHost: HTMLElement = canvasHostCandidate;
-const hotspotHost: HTMLElement = hotspotHostCandidate;
-
-type LegacySpeedState = GameState & { speed?: 0 | 1 | 3 | 8 };
-const advanceRealtimeCompat = advanceRealtime as unknown as (state: GameState, deltaSeconds: number, speed?: number) => boolean;
+const uiRoot = document.querySelector<HTMLElement>('#ui-root');
+const canvasHost = document.querySelector<HTMLElement>('#office-canvas');
+const hotspotHost = document.querySelector<HTMLElement>('#office-hotspots');
+if (!uiRoot || !canvasHost || !hotspotHost) throw new Error('Application hosts were not created');
 
 let state: GameState;
 let office: OfficeScene;
-let ui: GameUI;
-let lastFrame = performance.now();
-let weekAccumulator = 0;
-let liveAccumulator = 0;
+let ui: InterfaceController;
+let lastTick = performance.now();
+let technologyAccumulator = 0;
+let uiAccumulator = 0;
 let saveAccumulator = 0;
-let renderQueued = false;
 let saveManagerOpen = false;
-let rangeDragging = false;
-let rangeInputEvent = false;
-let pendingStructuralRender = false;
-let structureKey = '';
-const secondsPerWeek = 5 * 60 * 60 / 52;
+let lastBusinessWeek = -1;
+let runtimeStructure = '';
+let gameTimer = 0;
+const secondsPerTechnologyWeek = 5 * 60 * 60 / 52;
 
-const projectProgress = (): number => {
-  const active = state.projects.find((project) => project.stage !== 'ready' && !project.paused);
-  return active?.progress ?? 0;
-};
-
+const projectProgress = (): number => state.projects.find((project) => project.stage !== 'ready' && !project.paused)?.progress ?? 0;
 const activeProductGlow = (): number => {
   const active = state.products.filter((product) => product.status === 'selling');
-  if (!active.length) return 0.12;
-  return Math.min(1, active.reduce((sum, product) => sum + product.rating, 0) / active.length / 10);
+  return active.length ? Math.min(1, active.reduce((sum, product) => sum + product.rating, 0) / active.length / 10) : .12;
 };
 
-const removeLegacySpeedControls = (): void => {
-  uiRoot.querySelectorAll<HTMLElement>('[data-action="speed"], [data-speed]').forEach((element) => element.remove());
+const runtimeStructureKey = (): string => {
+  const projects = state.projects.map((project) => `${project.id}:${project.stage}:${project.paused}:${project.issues.filter((issue) => issue.status === 'open').length}`).join('|');
+  const research = state.activeResearch ? `${state.activeResearch.area}:${state.activeResearch.paused}` : 'none';
+  return `${projects}#${research}#${state.activeEvent?.id ?? 'none'}`;
 };
 
-const updateRangeReadout = (input: HTMLInputElement): void => {
-  const label = input.closest('label');
-  const readout = label?.querySelector<HTMLElement>('span b, output, [data-range-value]');
-  if (readout) readout.textContent = Number(input.value).toLocaleString('ja-JP');
+const pulseBusinessWeek = (): void => {
+  if (lastBusinessWeek === state.absoluteWeek) return;
+  lastBusinessWeek = state.absoluteWeek;
+  uiRoot.classList.remove('business-tick');
+  requestAnimationFrame(() => uiRoot.classList.add('business-tick'));
+  window.setTimeout(() => uiRoot.classList.remove('business-tick'), 320);
 };
 
-const renderUI = (): void => {
-  if (rangeDragging) {
-    pendingStructuralRender = true;
-    return;
-  }
-  (state as LegacySpeedState).speed = saveManagerOpen ? 0 : 1;
-  ui.setState(state);
-  ui.render();
-  removeLegacySpeedControls();
-  structureKey = realtimeStructureKey(state);
-  updateRealtimeUI(uiRoot, state);
-};
-
-const scheduleRender = (): void => {
-  if (rangeInputEvent) return;
-  if (rangeDragging) {
-    pendingStructuralRender = true;
-    return;
-  }
-  if (renderQueued) return;
-  renderQueued = true;
-  requestAnimationFrame(() => {
-    renderQueued = false;
-    renderUI();
-  });
-};
-
-const flushPendingStructuralRender = (): void => {
-  if (!pendingStructuralRender || rangeDragging || rangeInputEvent) return;
-  pendingStructuralRender = false;
-  scheduleRender();
-};
-
-const openPanel = (panel: PanelId): void => {
-  state.activePanel = panel;
-  saveState(state);
-  scheduleRender();
-};
+const openPanel = (panel: PanelId): void => ui.openPanel(panel);
 
 const openManager = async (): Promise<void> => {
   if (saveManagerOpen) return;
   saveManagerOpen = true;
-  (state as LegacySpeedState).speed = 0;
+  state.speed = 0;
   saveState(state);
-  scheduleRender();
   const replacement = await openSaveScreen({ currentState: state, createState: createInitialState, allowClose: true });
   if (replacement) {
     state = normalizeState(replacement);
-    weekAccumulator = 0;
-    structureKey = '';
+    technologyAccumulator = 0;
+    lastBusinessWeek = state.absoluteWeek;
+    runtimeStructure = runtimeStructureKey();
+    ui.setState(state);
   }
-  (state as LegacySpeedState).speed = 1;
+  state.speed = 1;
   saveManagerOpen = false;
-  scheduleRender();
+  lastTick = performance.now();
+  ui.sync(state, true);
 };
 
-const installStableRangeHandling = (): void => {
-  uiRoot.addEventListener('pointerdown', (event) => {
-    const input = event.target;
-    if (input instanceof HTMLInputElement && input.type === 'range') rangeDragging = true;
-  }, true);
-
-  uiRoot.addEventListener('input', (event) => {
-    const input = event.target;
-    if (!(input instanceof HTMLInputElement) || input.type !== 'range') return;
-    rangeInputEvent = true;
-    updateRangeReadout(input);
-    queueMicrotask(() => {
-      rangeInputEvent = false;
-      flushPendingStructuralRender();
-    });
-  }, true);
-
-  uiRoot.addEventListener('change', (event) => {
-    const input = event.target;
-    if (!(input instanceof HTMLInputElement) || input.type !== 'range') return;
-    rangeInputEvent = true;
-    rangeDragging = false;
-    updateRangeReadout(input);
-    queueMicrotask(() => {
-      rangeInputEvent = false;
-      flushPendingStructuralRender();
-    });
-  }, true);
-
-  window.addEventListener('pointerup', () => {
-    if (!rangeDragging) return;
-    rangeDragging = false;
-    requestAnimationFrame(flushPendingStructuralRender);
-  }, { passive: true });
-};
-
-async function start(): Promise<void> {
-  const selected = await openSaveScreen({ createState: createInitialState });
-  state = normalizeState(selected ?? createInitialState());
-  (state as LegacySpeedState).speed = 1;
-
-  ui = new GameUI(uiRoot, state, {
-    onStateChange: scheduleRender,
-    onReset: (replacement) => {
-      state = normalizeState(replacement);
-      (state as LegacySpeedState).speed = 1;
-      structureKey = '';
-      saveState(state);
-      scheduleRender();
-    },
-    onOpenSaveManager: () => { void openManager(); },
-    onResetCamera: () => office.resetCamera(),
-  });
-
-  office = createOfficeScene(canvasHost, hotspotHost, openPanel);
-  installStableRangeHandling();
-  renderUI();
-  requestAnimationFrame(loop);
-
-  const resizeObserver = new ResizeObserver(() => office.resize());
-  resizeObserver.observe(canvasHost);
-  window.addEventListener('beforeunload', () => saveState(state));
-}
-
-const loop = (now: number): void => {
-  const deltaSeconds = Math.min(0.1, Math.max(0, (now - lastFrame) / 1000));
-  lastFrame = now;
+const gameTick = (): void => {
+  const now = performance.now();
+  const deltaSeconds = Math.min(.12, Math.max(0, (now - lastTick) / 1000));
+  lastTick = now;
 
   office.update(deltaSeconds, {
     activePanel: state.activePanel,
@@ -199,28 +85,35 @@ const loop = (now: number): void => {
     timeSpeed: saveManagerOpen ? 0 : 1,
   });
 
-  const realtimeChanged = saveManagerOpen ? false : advanceRealtimeCompat(state, deltaSeconds, 1);
+  const beforeWeek = state.absoluteWeek;
+  const changed = saveManagerOpen ? false : advanceRealtime(state, deltaSeconds, 1);
+
   if (!saveManagerOpen) {
-    weekAccumulator += deltaSeconds;
-    if (weekAccumulator >= secondsPerWeek) {
-      weekAccumulator %= secondsPerWeek;
+    technologyAccumulator += deltaSeconds;
+    if (technologyAccumulator >= secondsPerTechnologyWeek) {
+      technologyAccumulator %= secondsPerTechnologyWeek;
       advanceWeek(state);
-      app.classList.remove('week-tick');
-      requestAnimationFrame(() => app.classList.add('week-tick'));
-      window.setTimeout(() => app.classList.remove('week-tick'), 720);
-      scheduleRender();
+      ui.sync(state);
+      runtimeStructure = runtimeStructureKey();
     }
   }
 
-  liveAccumulator += deltaSeconds;
-  if (realtimeChanged && liveAccumulator >= 0.12) {
-    liveAccumulator = 0;
-    const nextStructureKey = realtimeStructureKey(state);
-    if (nextStructureKey !== structureKey) {
-      structureKey = nextStructureKey;
-      scheduleRender();
-    } else {
-      updateRealtimeUI(uiRoot, state);
+  if (state.absoluteWeek !== beforeWeek) {
+    pulseBusinessWeek();
+    ui.sync(state);
+    runtimeStructure = runtimeStructureKey();
+    uiAccumulator = 0;
+  } else if (changed) {
+    uiAccumulator += deltaSeconds;
+    if (uiAccumulator >= .25) {
+      uiAccumulator = 0;
+      const nextStructure = runtimeStructureKey();
+      if (nextStructure !== runtimeStructure) {
+        runtimeStructure = nextStructure;
+        ui.sync(state);
+      } else {
+        ui.live(state);
+      }
     }
   }
 
@@ -229,7 +122,38 @@ const loop = (now: number): void => {
     saveAccumulator = 0;
     saveState(state);
   }
-  requestAnimationFrame(loop);
 };
+
+async function start(): Promise<void> {
+  const selected = await openSaveScreen({ createState: createInitialState });
+  state = normalizeState(selected ?? createInitialState());
+  state.speed = 1;
+  lastBusinessWeek = state.absoluteWeek;
+  runtimeStructure = runtimeStructureKey();
+
+  ui = new InterfaceController(uiRoot, state, {
+    onReset: (replacement) => {
+      state = normalizeState(replacement);
+      state.speed = 1;
+      lastBusinessWeek = state.absoluteWeek;
+      runtimeStructure = runtimeStructureKey();
+      saveState(state);
+      ui.setState(state);
+      ui.sync(state, true);
+    },
+    onOpenSaveManager: () => { void openManager(); },
+    onResetCamera: () => office.resetCamera(),
+  });
+
+  office = createOfficeScene(canvasHost, hotspotHost, openPanel);
+  lastTick = performance.now();
+  gameTimer = window.setInterval(gameTick, 50);
+  const resizeObserver = new ResizeObserver(() => office.resize());
+  resizeObserver.observe(canvasHost);
+  window.addEventListener('beforeunload', () => {
+    window.clearInterval(gameTimer);
+    saveState(state);
+  });
+}
 
 void start();
