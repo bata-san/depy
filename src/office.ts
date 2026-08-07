@@ -77,6 +77,7 @@ export function createOfficeScene(
   canvasHost: HTMLElement,
   overlay: HTMLElement,
   open: (panel: PanelId) => void,
+  onWorkdayEnded: () => void = () => undefined,
 ): OfficeScene {
   const scene = new THREE.Scene();
   const fog = new THREE.FogExp2(0x758a9a, .00235);
@@ -291,6 +292,7 @@ export function createOfficeScene(
     const staffPool = snapshot.staff.slice(0, Math.min(snapshot.staffCount, 30));
     visibleStaff = staffPresentAtHour(staffPool, visualHour);
     if (visualHour >= 17 && staffPool.length > 0 && visibleStaff.length === 0) {
+      onWorkdayEnded();
       city.skipToMorning();
       lighting = city.update(0);
       visualHour = lighting.hour;
