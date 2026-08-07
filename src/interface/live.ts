@@ -1,5 +1,6 @@
 import { ROLE_LABELS, SPECIALTY_LABELS, TRAIT_LABELS } from '../data';
 import { businessDateLabel } from '../business-cycle';
+import { getFactoryLineSnapshot } from '../factory-operations';
 import { financeSummary, runwayWeeks } from '../simulation';
 import { operationsStaffEffect, projectStaffEffect, researchStaffEffect, salesStaffEffect } from '../staff-effects';
 import type { GameState, ProjectStage } from '../types';
@@ -101,9 +102,18 @@ function patchFactories(root: HTMLElement, state: GameState): void {
   for (const contract of state.contracts.filter((item) => item.active)) {
     const card = root.querySelector<HTMLElement>(`[data-factory-card="${CSS.escape(contract.id)}"]`);
     if (!card) continue;
-    setText(card.querySelector('[data-factory-status]'), contract.setupRemaining ? `立上げ ${contract.setupRemaining}週` : '稼働中');
-    setText(card.querySelector('[data-factory-capacity]'), `${contract.committedCapacity.toLocaleString()} / 5秒`);
+    const line = getFactoryLineSnapshot(state, contract);
+    const status = contract.setupRemaining ? `立上げ ${contract.setupRemaining}週` : line.maintenance < 35 ? '要整備' : '稼働中';
+    setText(card.querySelector('[data-factory-status]'), status);
+    setClassTone(card.querySelector('[data-factory-status]'), line.maintenance < 35 ? 'is-bad' : contract.setupRemaining ? 'is-warning' : 'is-good');
+    setText(card.querySelector('[data-factory-capacity]'), `${line.effectiveCapacity.toLocaleString()} / 5秒`);
     setText(card.querySelector('[data-factory-remaining]'), `${contract.remainingWeeks}週`);
+    setText(card.querySelector('[data-factory-allocated]'), line.allocated.toLocaleString());
+    setText(card.querySelector('[data-factory-util]'), `${Math.round(line.utilization * 100)}%`);
+    setText(card.querySelector('[data-factory-maint]'), String(Math.round(line.maintenance)));
+    setText(card.querySelector('[data-factory-process]'), String(Math.round(line.processControl)));
+    setText(card.querySelector('[data-factory-exp]'), String(Math.round(line.experience)));
+    setText(card.querySelector('[data-factory-management]'), `${Math.round(line.management * 100)}%`);
   }
 }
 
