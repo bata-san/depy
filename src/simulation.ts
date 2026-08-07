@@ -11,10 +11,11 @@ import {
   endProductNow, getFactoryDefinition, improveProductSupport, launchProduct, releaseProductUpdate,
   runMarketingCampaign,
 } from './manufacturing-system';
+import { improveFactoryLine, serviceFactoryLine } from './factory-operations';
 import { activeCompetitorModels, updateCompetitorsWeekly } from './competitor-system';
 import {
   dismissStaff, giveStaffBonus, hireCandidate, loanOffers, recurringWeeklyBurn, runwayWeeks,
-  takeLoan, upgradeFacility,
+  staffCapacity, takeLoan, upgradeFacility,
 } from './company-system';
 import { trainStaffEnhanced, updateStaffCareer } from './staff-career';
 import { advanceStaffDrivenRealtime } from './staff-runtime';
@@ -29,9 +30,9 @@ export {
   changeContractCapacity, changeProductAllocation, changeProductPrice, contractFactory, createInitialState,
   createSeries, dateLabel, defaultDesign, defaultTechnology, designCaps, dismissNotification, dismissStaff,
   endProductNow, businessFinanceSummary as financeSummary, getFactoryDefinition, getFacilityLevel, giveStaffBonus, hireCandidate,
-  improveProductSupport, inferAudience, launchProduct, loadState, loanOffers, normalizeState, recurringWeeklyBurn,
+  improveFactoryLine, improveProductSupport, inferAudience, launchProduct, loadState, loanOffers, normalizeState, recurringWeeklyBurn,
   releaseProductUpdate, resetState, resolveProjectIssue, runMarketingCampaign, runwayWeeks, saveState,
-  startGeneration, startResearch, takeLoan, toggleProjectPause, toggleResearchPause,
+  serviceFactoryLine, staffCapacity, startGeneration, startResearch, takeLoan, toggleProjectPause, toggleResearchPause,
   trainStaffEnhanced as trainStaff, upgradeFacility,
 };
 
@@ -97,7 +98,6 @@ export function advanceRealtime(state: GameState, deltaSeconds: number, speed: G
   return changed;
 }
 
-/** Slow technical-history clock. Main calls this roughly once every 5m46s. */
 export function advanceWeek(state: GameState): void {
   advanceTechnologyWeek(state);
 }
