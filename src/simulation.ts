@@ -10,7 +10,7 @@ import {
   endProductNow, getFactoryDefinition, improveProductSupport, launchProduct, releaseProductUpdate,
   runMarketingCampaign,
 } from './manufacturing-system';
-import { activeCompetitorModels } from './competitor-system';
+import { activeCompetitorModels, updateCompetitorsWeekly } from './competitor-system';
 import {
   dismissStaff, financeSummary, giveStaffBonus, hireCandidate, loanOffers, recurringWeeklyBurn, runwayWeeks,
   takeLoan, trainStaff, upgradeFacility,
@@ -86,6 +86,7 @@ export function advanceRealtime(state: GameState, deltaSeconds: number, speed: G
   while (accumulator >= BUSINESS_WEEK_SECONDS) {
     accumulator -= BUSINESS_WEEK_SECONDS;
     advanceBusinessWeek(state);
+    updateCompetitorsWeekly(state);
     changed = true;
   }
   businessAccumulators.set(state, accumulator);
