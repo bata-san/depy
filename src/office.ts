@@ -40,10 +40,11 @@ export function createOfficeScene(
   open: (panel: PanelId) => void,
 ): OfficeScene {
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x142033, .0085);
+  const fog = new THREE.FogExp2(0x758a9a, .00235);
+  scene.fog = fog;
   const city = cityBackdrop(scene);
 
-  const camera = new THREE.PerspectiveCamera(32, 1, .1, 180);
+  const camera = new THREE.PerspectiveCamera(32, 1, .1, 700);
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   const maxPixelRatio = Math.min(window.devicePixelRatio || 1, 1.4);
   let pixelRatio = Math.min(maxPixelRatio, 1.2);
@@ -52,7 +53,7 @@ export function createOfficeScene(
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.18;
+  renderer.toneMappingExposure = 1.08;
   renderer.domElement.style.touchAction = 'none';
   canvasHost.append(renderer.domElement);
 
@@ -63,7 +64,8 @@ export function createOfficeScene(
   controls.minPolarAngle = Math.PI * .12;
   controls.maxPolarAngle = Math.PI * .49;
 
-  scene.add(new THREE.HemisphereLight(0xcdeaff, 0x15202a, 1.75));
+  const hemisphere = new THREE.HemisphereLight(0xcdeaff, 0x15202a, 1.75);
+  scene.add(hemisphere);
   const sun = new THREE.DirectionalLight(0xffd7b0, 3.35);
   sun.position.set(-10, 15, 8);
   sun.castShadow = true;
@@ -204,7 +206,17 @@ export function createOfficeScene(
       researchActive: snapshot.researchActive,
       cashHealth: snapshot.cashHealth,
     });
-    city.update(delta);
+
+    const lighting = city.update(delta);
+    hemisphere.color.copy(lighting.hemisphereSky);
+    hemisphere.groundColor.copy(lighting.hemisphereGround);
+    hemisphere.intensity = .42 + lighting.daylight * 1.35 + lighting.night * .18;
+    sun.color.copy(lighting.sunColor);
+    sun.intensity = lighting.sunIntensity;
+    windowFill.color.copy(lighting.windowFill);
+    windowFill.intensity = .35 + lighting.daylight * .9 + lighting.night * .32;
+    fog.color.copy(lighting.fogColor);
+    renderer.toneMappingExposure = lighting.exposure;
 
     progressScreens.forEach((screen, index) => materialIntensity(screen, .78 + snapshot.projectProgress / 100 * 1.25 + Math.sin(time * 1.4 + index) * .06));
     gpuFans.forEach((fan, index) => { fan.rotation.z -= delta * (1.8 + snapshot.productGlow * 4.2 + index * .16); });
@@ -218,7 +230,7 @@ export function createOfficeScene(
     if (researchScreen) materialIntensity(researchScreen, snapshot.researchActive ? 1.9 + Math.sin(time * 3) * .32 : .68);
     if (waferScreen) materialIntensity(waferScreen, snapshot.researchActive ? 1.6 + Math.sin(time * 4.2) * .28 : .58);
     serverLights.forEach((light, index) => materialIntensity(light, .48 + Math.max(0, Math.sin(time * (2.1 + index % 3) + index)) * .95));
-    localGlow.intensity = 14 + snapshot.projectProgress * .08 + snapshot.productGlow * 5;
+    localGlow.intensity = 12 + lighting.night * 9 + snapshot.projectProgress * .08 + snapshot.productGlow * 5;
 
     hotspotSeconds += rawDelta;
     if (hotspotSeconds >= .09) {
