@@ -9,8 +9,8 @@ interface CameraSnapshot {
 }
 
 const defaultSnapshot: CameraSnapshot = {
-  position: [16, 14.2, 18.8],
-  target: [0, 1.25, 0],
+  position: [19.5, 16.2, 23.5],
+  target: [0, 1.2, 3.2],
 };
 
 function loadSnapshot(): CameraSnapshot {
@@ -34,8 +34,8 @@ export class CameraController {
     controls.enableDamping = true;
     controls.enablePan = true;
     controls.enableRotate = true;
-    controls.minDistance = 10;
-    controls.maxDistance = 35;
+    controls.minDistance = 9;
+    controls.maxDistance = 62;
     controls.maxPolarAngle = Math.PI * .49;
     const events = controls as unknown as { addEventListener: (type: string, listener: () => void) => void };
     events.addEventListener('start', () => { this.interacting = true; });
@@ -44,7 +44,6 @@ export class CameraController {
   }
 
   update(delta: number): void {
-    // Only OrbitControls owns the camera after initialization. UI renders never write position/target.
     this.controls.update(delta);
   }
 
