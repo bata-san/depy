@@ -95,7 +95,8 @@ function crateCluster(): THREE.Group {
   const group = new THREE.Group();
   const cardboard = material(0x8b6847, .92, .01);
   const tape = material(0xcaa16a, .8, .01);
-  [[7.0, 4.65, .55], [6.45, 4.95, .4], [7.15, 4.15, .34]].forEach(([x, z, s], index) => {
+  const crates: Array<[number, number, number]> = [[7.0, 4.65, .55], [6.45, 4.95, .4], [7.15, 4.15, .34]];
+  crates.forEach(([x, z, s], index) => {
     group.add(roundedBox(s, s * .72, s, cardboard, x, s * .36, z));
     group.add(box(.06, s * .73, s * 1.01, tape, x + (index % 2 ? .08 : -.06), s * .36, z));
   });
