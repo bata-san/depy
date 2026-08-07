@@ -13,8 +13,9 @@ import {
 import { activeCompetitorModels, updateCompetitorsWeekly } from './competitor-system';
 import {
   dismissStaff, financeSummary, giveStaffBonus, hireCandidate, loanOffers, recurringWeeklyBurn, runwayWeeks,
-  takeLoan, trainStaff, upgradeFacility,
+  takeLoan, upgradeFacility,
 } from './company-system';
+import { trainStaffEnhanced, updateStaffCareer } from './staff-career';
 import { advanceStaffDrivenRealtime } from './staff-runtime';
 import {
   addLedger, addNotice, clamp, createInitialState, dateLabel, dismissNotification, loadState, normalizeState,
@@ -29,7 +30,8 @@ export {
   endProductNow, financeSummary, getFactoryDefinition, getFacilityLevel, giveStaffBonus, hireCandidate,
   improveProductSupport, inferAudience, launchProduct, loadState, loanOffers, normalizeState, recurringWeeklyBurn,
   releaseProductUpdate, resetState, resolveProjectIssue, runMarketingCampaign, runwayWeeks, saveState,
-  startGeneration, startResearch, takeLoan, toggleProjectPause, toggleResearchPause, trainStaff, upgradeFacility,
+  startGeneration, startResearch, takeLoan, toggleProjectPause, toggleResearchPause,
+  trainStaffEnhanced as trainStaff, upgradeFacility,
 };
 
 export function focusLabel(focus: SeriesFocus): string { return SERIES_FOCUS_LABELS[focus]; }
@@ -86,6 +88,7 @@ export function advanceRealtime(state: GameState, deltaSeconds: number, speed: G
   while (accumulator >= BUSINESS_WEEK_SECONDS) {
     accumulator -= BUSINESS_WEEK_SECONDS;
     advanceBusinessWeek(state);
+    updateStaffCareer(state);
     updateCompetitorsWeekly(state);
     changed = true;
   }
