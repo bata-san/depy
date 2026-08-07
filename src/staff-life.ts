@@ -1,6 +1,22 @@
-import type { GameState, StaffMember, StaffRole } from './types';
+import type { GameState, StaffMember, StaffRole, StaffSpecialty, StaffTrait } from './types';
 
 export type StaffArchetype = 'ace' | 'craftsperson' | 'inventor' | 'captain' | 'steady' | 'sprinter';
+
+export interface StaffLifeInput {
+  id: string;
+  name: string;
+  role: StaffRole;
+  specialty: StaffSpecialty;
+  traits: StaffTrait[];
+  level: number;
+  skill: number;
+  creativity: number;
+  discipline: number;
+  growth: number;
+  morale: number;
+  fatigue: number;
+  loyalty: number;
+}
 
 export interface StaffLifeProfile {
   archetype: StaffArchetype;
@@ -37,7 +53,7 @@ function hash01(text: string, salt = 0): number {
   return ((hash >>> 0) % 10000) / 10000;
 }
 
-function archetypeFor(member: StaffMember): StaffArchetype {
+function archetypeFor(member: StaffLifeInput): StaffArchetype {
   if (member.traits.includes('prodigy') || member.creativity >= 84) return 'inventor';
   if (member.traits.includes('veteran') || member.discipline >= 86) return 'craftsperson';
   if (member.traits.includes('communicator') || member.loyalty >= 88) return 'captain';
@@ -46,7 +62,7 @@ function archetypeFor(member: StaffMember): StaffArchetype {
   return 'steady';
 }
 
-export function staffLifeProfile(member: StaffMember): StaffLifeProfile {
+export function staffLifeProfile(member: StaffLifeInput): StaffLifeProfile {
   const archetype = archetypeFor(member);
   const jitter = hash01(member.id, 17) - .5;
   const morningBias = member.discipline / 100 * .55 + (member.traits.includes('veteran') ? .15 : 0);
@@ -73,12 +89,12 @@ export function staffLifeProfile(member: StaffMember): StaffLifeProfile {
   return { archetype, title, arrivalHour, leaveHour, focus, resilience, teamwork, ambition, overtime, contribution, summary };
 }
 
-export function isStaffAtOffice(member: StaffMember, hour: number): boolean {
+export function isStaffAtOffice(member: StaffLifeInput, hour: number): boolean {
   const profile = staffLifeProfile(member);
   return hour >= profile.arrivalHour && hour < profile.leaveHour;
 }
 
-export function staffPresentAtHour(staff: StaffMember[], hour: number): StaffMember[] {
+export function staffPresentAtHour<T extends StaffLifeInput>(staff: T[], hour: number): T[] {
   return staff.filter((member) => isStaffAtOffice(member, hour));
 }
 
@@ -105,7 +121,7 @@ export function staffWeeklyConditionDelta(member: StaffMember, workload: number,
   return { fatigue, morale, xp };
 }
 
-export function staffPairSynergy(a: StaffMember, b: StaffMember): number {
+export function staffPairSynergy(a: StaffLifeInput, b: StaffLifeInput): number {
   const pa = staffLifeProfile(a);
   const pb = staffLifeProfile(b);
   const specialtyBonus = a.specialty !== b.specialty ? 6 : -2;
