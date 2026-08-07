@@ -1,9 +1,5 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { AmbientAnimationSystem } from './ambient-animations';
 import { CameraController } from './camera-controller';
 import { cityBackdrop } from './city-backdrop';
@@ -44,17 +40,19 @@ export function createOfficeScene(
   open: (panel: PanelId) => void,
 ): OfficeScene {
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x142033, .009);
-  cityBackdrop(scene);
+  scene.fog = new THREE.FogExp2(0x142033, .0085);
+  const city = cityBackdrop(scene);
 
-  const camera = new THREE.PerspectiveCamera(31, 1, .1, 180);
+  const camera = new THREE.PerspectiveCamera(32, 1, .1, 180);
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  const maxPixelRatio = Math.min(window.devicePixelRatio || 1, 1.4);
+  let pixelRatio = Math.min(maxPixelRatio, 1.2);
+  renderer.setPixelRatio(pixelRatio);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  (renderer as unknown as { toneMappingExposure: number }).toneMappingExposure = 1.14;
+  renderer.toneMappingExposure = 1.18;
   renderer.domElement.style.touchAction = 'none';
   canvasHost.append(renderer.domElement);
 
@@ -62,29 +60,29 @@ export function createOfficeScene(
   const cameraController = new CameraController(camera, controls);
   controls.minDistance = 8.5;
   controls.maxDistance = 38;
-  (controls as unknown as { minPolarAngle: number }).minPolarAngle = Math.PI * .12;
+  controls.minPolarAngle = Math.PI * .12;
   controls.maxPolarAngle = Math.PI * .49;
 
-  scene.add(new THREE.HemisphereLight(0xc8e7ff, 0x17212b, 1.55));
-  const sun = new THREE.DirectionalLight(0xffd8b0, 4.1);
-  sun.position.set(-11, 16, 9);
+  scene.add(new THREE.HemisphereLight(0xcdeaff, 0x15202a, 1.75));
+  const sun = new THREE.DirectionalLight(0xffd7b0, 3.35);
+  sun.position.set(-10, 15, 8);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -16;
-  sun.shadow.camera.right = 16;
-  sun.shadow.camera.top = 16;
-  sun.shadow.camera.bottom = -16;
-  sun.shadow.bias = -.0004;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.left = -12;
+  sun.shadow.camera.right = 12;
+  sun.shadow.camera.top = 11;
+  sun.shadow.camera.bottom = -11;
+  sun.shadow.camera.near = 3;
+  sun.shadow.camera.far = 34;
+  sun.shadow.bias = -.00035;
   scene.add(sun);
-  const windowLight = new THREE.PointLight(0x6ebdff, 38, 25, 2);
-  windowLight.position.set(0, 7.2, -7.3);
-  scene.add(windowLight);
-  const coolFill = new THREE.PointLight(0x4b9fff, 25, 18, 2);
-  coolFill.position.set(5.8, 4.4, -.8);
-  scene.add(coolFill);
-  const warmFill = new THREE.PointLight(0xffa968, 22, 17, 2);
-  warmFill.position.set(-5.3, 3.8, 3.7);
-  scene.add(warmFill);
+
+  const windowFill = new THREE.DirectionalLight(0x78bfff, 1.05);
+  windowFill.position.set(0, 7, -12);
+  scene.add(windowFill);
+  const localGlow = new THREE.PointLight(0x6dbdff, 18, 18, 2);
+  localGlow.position.set(2.5, 4.2, -.6);
+  scene.add(localGlow);
 
   const layout = buildOfficeLayout(scene);
   const robotBeacon = layout.robot.getObjectByName('robot-beacon') as THREE.Mesh;
@@ -94,16 +92,6 @@ export function createOfficeScene(
     dataCubes: layout.dataCubes,
     ceilingLights: layout.ceilingLights,
   });
-
-  const renderPass = new RenderPass(scene, camera);
-  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), .35, .42, .82);
-  bloom.threshold = .72;
-  bloom.strength = .32;
-  bloom.radius = .38;
-  const composer = new EffectComposer(renderer);
-  composer.addPass(renderPass);
-  composer.addPass(bloom);
-  composer.addPass(new OutputPass());
 
   const definitions: Array<[PanelId, THREE.Object3D, string, string]> = [
     ['development', layout.developmentDesks[0] ?? layout.office, '世代開発', '設計・進行・問題対応'],
@@ -134,30 +122,73 @@ export function createOfficeScene(
   const researchChamber = layout.research.getObjectByName('research-chamber');
   const chip = layout.showcase.getObjectByName('product-chip') ?? layout.showcase;
   const gpu = layout.showcase.getObjectByName('product-gpu') ?? layout.showcase;
-  const cityCars = scene.getObjectsByProperty('name', 'city-car') as THREE.Mesh[];
+
+  chip.traverse((object) => { if (object instanceof THREE.Mesh) object.castShadow = false; });
+  gpu.traverse((object) => { if (object instanceof THREE.Mesh) object.castShadow = false; });
+
+  renderer.shadowMap.autoUpdate = false;
+  renderer.shadowMap.needsUpdate = true;
+
   const clock = new THREE.Clock();
   let snapshot: OfficeSnapshot = {
     activePanel: 'home', projectProgress: 0, productGlow: .1, staffCount: 5,
     officeLevel: 1, researchActive: false, cashHealth: .5, timeSpeed: 1,
   };
+  let qualitySeconds = 0;
+  let qualityFrames = 0;
+  let hotspotSeconds = 0;
 
   const resize = (): void => {
     const rect = canvasHost.getBoundingClientRect();
     const width = Math.max(1, rect.width);
     const height = Math.max(1, rect.height);
     renderer.setSize(width, height, false);
-    composer.setSize(width, height);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
   };
   resize();
 
+  const updateAdaptiveResolution = (rawDelta: number): void => {
+    qualitySeconds += rawDelta;
+    qualityFrames += 1;
+    if (qualitySeconds < 2.5) return;
+    const fps = qualityFrames / qualitySeconds;
+    let nextRatio = pixelRatio;
+    if (fps < 43) nextRatio = Math.max(.82, pixelRatio - .14);
+    else if (fps > 57) nextRatio = Math.min(maxPixelRatio, pixelRatio + .08);
+    if (Math.abs(nextRatio - pixelRatio) >= .04) {
+      pixelRatio = nextRatio;
+      renderer.setPixelRatio(pixelRatio);
+      resize();
+    }
+    qualitySeconds = 0;
+    qualityFrames = 0;
+  };
+
+  const updateHotspots = (): void => {
+    const rect = canvasHost.getBoundingClientRect();
+    const point = new THREE.Vector3();
+    hotspots.forEach((hotspot) => {
+      hotspot.object.getWorldPosition(point);
+      point.y += hotspot.id === 'competitors' ? .55 : 2.2;
+      point.project(camera);
+      const visible = point.z < 1 && point.x > -1.15 && point.x < 1.15 && point.y > -1.15 && point.y < 1.15 && snapshot.activePanel === 'home';
+      hotspot.marker.style.left = `${(point.x * .5 + .5) * rect.width}px`;
+      hotspot.marker.style.top = `${(-point.y * .5 + .5) * rect.height}px`;
+      hotspot.marker.style.opacity = visible ? '1' : snapshot.activePanel === hotspot.id ? '.96' : '0';
+      hotspot.marker.style.pointerEvents = visible ? 'auto' : 'none';
+      hotspot.marker.classList.toggle('active', hotspot.id === snapshot.activePanel);
+    });
+  };
+
   let frame = 0;
   const animate = (): void => {
     frame = requestAnimationFrame(animate);
-    const delta = Math.min(.05, clock.getDelta());
+    const rawDelta = clock.getDelta();
+    const delta = Math.min(.05, rawDelta);
     const time = performance.now() * .001;
     cameraController.update(delta);
+    updateAdaptiveResolution(rawDelta);
 
     layout.characterAnimations.update(time, {
       staffCount: snapshot.staffCount,
@@ -173,45 +204,28 @@ export function createOfficeScene(
       researchActive: snapshot.researchActive,
       cashHealth: snapshot.cashHealth,
     });
+    city.update(delta);
 
-    progressScreens.forEach((screen, index) => {
-      materialIntensity(screen, .82 + snapshot.projectProgress / 100 * 1.55 + Math.sin(time * 1.4 + index) * .08);
-    });
-    gpuFans.forEach((fan, index) => { fan.rotation.z -= delta * (1.7 + snapshot.productGlow * 4.6 + index * .2); });
-    pcFans.forEach((fan, index) => { fan.rotation.z -= delta * (1.15 + snapshot.projectProgress * .018 + index % 3 * .12); });
-    chip.rotation.y += delta * (.22 + snapshot.productGlow * .6);
-    chip.position.y = .72 + Math.sin(time * .7) * .025;
-    gpu.rotation.y = .12 + Math.sin(time * .42) * .075;
-    gpu.position.y = .98 + Math.sin(time * .62 + 1.4) * .025;
-    if (waferPlatter) waferPlatter.rotation.y += delta * (snapshot.researchActive ? 1.18 : .22);
-    if (researchChamber) researchChamber.rotation.y += delta * (snapshot.researchActive ? .72 : .12);
-    if (researchScreen) materialIntensity(researchScreen, snapshot.researchActive ? 2.2 + Math.sin(time * 3) * .42 : .72);
-    if (waferScreen) materialIntensity(waferScreen, snapshot.researchActive ? 1.8 + Math.sin(time * 4.2) * .35 : .62);
-    serverLights.forEach((light, index) => materialIntensity(light, .55 + Math.max(0, Math.sin(time * (2.4 + index % 3) + index)) * 1.35));
-    cityCars.forEach((car) => {
-      const direction = Number(car.userData.lane ?? 0) === 0 ? 1 : -1;
-      car.position.x += delta * Number(car.userData.speed ?? .4) * direction;
-      if (car.position.x > 20) car.position.x = -20;
-      if (car.position.x < -20) car.position.x = 20;
-    });
-    coolFill.intensity = 22 + snapshot.projectProgress * .14;
-    warmFill.intensity = 20 + snapshot.cashHealth * 15;
-    windowLight.intensity = 34 + Math.sin(time * .08) * 3;
+    progressScreens.forEach((screen, index) => materialIntensity(screen, .78 + snapshot.projectProgress / 100 * 1.25 + Math.sin(time * 1.4 + index) * .06));
+    gpuFans.forEach((fan, index) => { fan.rotation.z -= delta * (1.8 + snapshot.productGlow * 4.2 + index * .16); });
+    pcFans.forEach((fan, index) => { fan.rotation.z -= delta * (1.1 + snapshot.projectProgress * .015 + index % 3 * .1); });
+    chip.rotation.y += delta * (.22 + snapshot.productGlow * .55);
+    chip.position.y = .72 + Math.sin(time * .7) * .022;
+    gpu.rotation.y = .12 + Math.sin(time * .42) * .068;
+    gpu.position.y = .98 + Math.sin(time * .62 + 1.4) * .022;
+    if (waferPlatter) waferPlatter.rotation.y += delta * (snapshot.researchActive ? 1.1 : .2);
+    if (researchChamber) researchChamber.rotation.y += delta * (snapshot.researchActive ? .68 : .1);
+    if (researchScreen) materialIntensity(researchScreen, snapshot.researchActive ? 1.9 + Math.sin(time * 3) * .32 : .68);
+    if (waferScreen) materialIntensity(waferScreen, snapshot.researchActive ? 1.6 + Math.sin(time * 4.2) * .28 : .58);
+    serverLights.forEach((light, index) => materialIntensity(light, .48 + Math.max(0, Math.sin(time * (2.1 + index % 3) + index)) * .95));
+    localGlow.intensity = 14 + snapshot.projectProgress * .08 + snapshot.productGlow * 5;
 
-    const rect = canvasHost.getBoundingClientRect();
-    hotspots.forEach((hotspot) => {
-      const point = new THREE.Vector3();
-      hotspot.object.getWorldPosition(point);
-      point.y += hotspot.id === 'competitors' ? .55 : 2.2;
-      point.project(camera);
-      const visible = point.z < 1 && point.x > -1.15 && point.x < 1.15 && point.y > -1.15 && point.y < 1.15 && snapshot.activePanel === 'home';
-      hotspot.marker.style.left = `${(point.x * .5 + .5) * rect.width}px`;
-      hotspot.marker.style.top = `${(-point.y * .5 + .5) * rect.height}px`;
-      hotspot.marker.style.opacity = visible ? '1' : snapshot.activePanel === hotspot.id ? '.96' : '0';
-      hotspot.marker.style.pointerEvents = visible ? 'auto' : 'none';
-      hotspot.marker.classList.toggle('active', hotspot.id === snapshot.activePanel);
-    });
-    composer.render();
+    hotspotSeconds += rawDelta;
+    if (hotspotSeconds >= .09) {
+      hotspotSeconds = 0;
+      updateHotspots();
+    }
+    renderer.render(scene, camera);
   };
   animate();
 
@@ -222,7 +236,6 @@ export function createOfficeScene(
     dispose() {
       cancelAnimationFrame(frame);
       cameraController.dispose();
-      composer.dispose();
       renderer.dispose();
       renderer.domElement.remove();
       hotspots.forEach((hotspot) => hotspot.marker.remove());
