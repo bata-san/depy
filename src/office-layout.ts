@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CharacterAnimationSystem } from './character-animations';
 import { addCeiling, addZoneFloor, makeLeftWall, makeWindowWall } from './office-architecture';
+import { addDeskAccentBars, addEquipmentCases, addStaffContactShadows, addZoneSigns } from './office-decor';
 import {
   addFloorTiles, box, deliveryRobot, desk, emissiveMaterial, floatingDataCube, material, meetingArea,
   partsShelf, plant, productShowcase, researchBench, serverRack, staffPerson, waferInspectionStation, wallDisplay,
@@ -43,7 +44,7 @@ export function buildOfficeLayout(scene: THREE.Scene) {
 
   const cableTray = material(0x16232d, .3, .72);
   office.add(box(13.9, .17, .4, cableTray, -.05, 4.94, -4.95), box(.4, .17, 8.5, cableTray, 7.38, 4.94, -.8));
-  for (let x = -6.35; x <= 6.35; x += 1.55) office.add(box(.075, .11, .29, emissiveMaterial(0xffffff, 0x8ecfff, .34), x, 4.86, -4.96));
+  for (let x = -6.35; x <= 6.35; x += 1.55) office.add(box(.075, .11, .29, emissiveMaterial(0xffffff, 0x8ecfff, .3), x, 4.86, -4.96));
 
   const competitorScreen = wallDisplay(1.85, 3.55, -5.91, 3.25, 0xff626e, 'competitor-screen');
   const financeScreen = wallDisplay(5.65, 3.55, -5.91, 2.75, 0x70d8a4, 'finance-screen');
@@ -51,10 +52,9 @@ export function buildOfficeLayout(scene: THREE.Scene) {
 
   office.add(plant(-7.28, -5.16, 1.05), plant(7.3, 5.1, 1.2), plant(-7.2, 5.05, .85), plant(1.2, 5.1, .72));
   office.add(box(3.65, 1.22, .1, material(0xe2e8ea, .72), -5.75, 3.45, -5.91));
-  const logoPlate = box(2.55, .67, .1, emissiveMaterial(0x14283a, 0x4ea8ff, .82), -5.75, 4.52, -5.86);
+  const logoPlate = box(2.55, .67, .1, emissiveMaterial(0x14283a, 0x4ea8ff, .68), -5.75, 4.52, -5.86);
   logoPlate.name = 'office-logo';
   office.add(logoPlate);
-  for (let x = -6.7; x <= -4.8; x += .38) office.add(box(.22, .035, .025, emissiveMaterial(0x1c3346, 0x5ec6ff, .35), x, 4.52, -5.79));
 
   const robot = deliveryRobot();
   office.add(robot);
@@ -67,19 +67,23 @@ export function buildOfficeLayout(scene: THREE.Scene) {
   dataCubes.forEach((cube) => office.add(cube));
 
   const staffColors = [0x5aa7ff, 0xff8d71, 0x79d69c, 0xc998ff, 0xffc56f, 0x62cbd3, 0xf178a7, 0x95c76f, 0x7398e8, 0xe89f73, 0x70d1b6, 0xb286e8];
-  const staffPositions: [number, number, number][] = [
+  const staffPositions: Array<[number, number, number]> = [
     [-5.65, -2.9, Math.PI], [-2.75, -2.9, Math.PI], [-5.65, -2.12, 0], [-2.75, -2.12, 0],
     [5.0, -2.9, Math.PI], [1.9, -2.9, Math.PI], [-5.05, 2.7, 0], [.2, 2.4, 0],
     [4.85, 2.45, 0], [6.0, -.15, Math.PI / 2], [-.85, 4.92, Math.PI / 2], [2.15, 4.92, -Math.PI / 2],
   ];
+  addStaffContactShadows(office, staffPositions);
   const people = staffPositions.map(([x, z, rotation], index) => staffPerson(staffColors[index] ?? 0x6dafff, x, z, rotation, index));
   people.forEach((person) => office.add(person));
   const characterAnimations = new CharacterAnimationSystem(people);
 
-  const glassPartition = new THREE.MeshPhysicalMaterial({ color: 0x91c8df, transparent: true, opacity: .12, transmission: .72, roughness: .12 });
-  office.add(box(.045, 2.72, 4.2, glassPartition, 1.05, 1.55, 3.35));
-  for (const z of [1.25, 3.35, 5.45]) office.add(box(.1, 2.85, .1, material(0x263743, .3, .68), 1.05, 1.55, z));
-  office.add(box(.12, 2.85, .1, material(0x263743, .3, .68), 1.05, 1.55, 1.25));
+  const glassPartition = new THREE.MeshStandardMaterial({ color: 0x7faec3, transparent: true, opacity: .13, roughness: .18, metalness: .18, depthWrite: false });
+  office.add(box(.035, 2.72, 4.2, glassPartition, 1.05, 1.55, 3.35));
+  for (const z of [1.25, 3.35, 5.45]) office.add(box(.08, 2.85, .08, material(0x263743, .3, .68), 1.05, 1.55, z));
+
+  addEquipmentCases(office);
+  addZoneSigns(office);
+  addDeskAccentBars(office);
 
   scene.add(office);
 
