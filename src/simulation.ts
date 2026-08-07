@@ -1,6 +1,5 @@
 import { SERIES_FOCUS_LABELS } from './data';
-import { advanceBusinessWeek, advanceTechnologyWeek, BUSINESS_WEEK_SECONDS } from './business-cycle';
-import { nextDecisionEventWeek } from './event-system';
+import { advanceBusinessWeek, advanceTechnologyWeek, BUSINESS_WEEK_SECONDS, nextBusinessEventWeek } from './business-cycle';
 import {
   availableNodes, availablePackages, calculateMetrics, createSeries, defaultDesign, defaultTechnology,
   designCaps, getFacilityLevel, inferAudience, resolveProjectIssue, startGeneration, startResearch,
@@ -74,7 +73,7 @@ export function resolveDecisionEvent(state: GameState, choiceId: string): { ok: 
   }
   addNotice(state, event.title, `${choice.label}を選択しました。`, choice.tone === 'bad' ? 'warning' : 'info');
   state.activeEvent = null;
-  state.nextEventWeek = nextDecisionEventWeek(state.absoluteWeek);
+  state.nextEventWeek = nextBusinessEventWeek(state.absoluteWeek);
   return { ok: true, message: '判断を反映しました。' };
 }
 
