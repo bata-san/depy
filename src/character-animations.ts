@@ -1,11 +1,21 @@
 import * as THREE from 'three';
+import type { StaffRole } from './types';
 
 export type CharacterAnimation =
   | 'typing' | 'soldering' | 'inspecting' | 'walking' | 'presenting'
   | 'resting' | 'talking' | 'carrying' | 'celebrating' | 'frustrated';
 
+export interface StaffVisualState {
+  id: string;
+  name: string;
+  role: StaffRole;
+  morale: number;
+  fatigue: number;
+}
+
 export interface CharacterAnimationContext {
   staffCount: number;
+  staff: StaffVisualState[];
   projectActive: boolean;
   researchActive: boolean;
   productActive: boolean;
@@ -119,6 +129,8 @@ export class CharacterAnimationSystem {
       if (!rig.root.visible) return;
       const mode = this.modeFor(index, context, time + rig.phase);
       rig.animation = mode;
+      rig.root.userData.animation = mode;
+      rig.root.userData.staffId = context.staff[index]?.id ?? '';
       const t = time + rig.phase;
       const pose = this.poseFor(rig, mode, t);
       this.applyPose(rig, pose, alpha);
@@ -126,18 +138,20 @@ export class CharacterAnimationSystem {
   }
 
   private modeFor(index: number, context: CharacterAnimationContext, t: number): CharacterAnimation {
+    const member = context.staff[index];
     if (context.timeSpeed === 0) return index % 3 === 0 ? 'resting' : 'talking';
-    if (index === 6) return context.researchActive ? 'soldering' : 'inspecting';
-    if (index === 8) return context.productActive ? 'presenting' : 'inspecting';
-    if (index === 9) return 'carrying';
-    if (index === 10) return 'walking';
-    if (index === 11) return Math.floor(t / 11) % 2 === 0 ? 'talking' : 'resting';
-    if (index === 5) return context.productActive ? 'presenting' : 'talking';
-    if (index < 4) {
-      if (!context.projectActive) return Math.floor(t / 12 + index) % 3 === 0 ? 'frustrated' : 'resting';
-      return index % 3 === 0 ? 'soldering' : 'typing';
-    }
-    if (context.productActive && Math.floor(t / 18 + index) % 7 === 0) return 'celebrating';
+    if (!member) return defaultModes[index % defaultModes.length] ?? 'typing';
+    if (member.fatigue >= 92) return Math.floor(t / 8) % 2 ? 'resting' : 'frustrated';
+    if (member.morale <= 24) return Math.floor(t / 10) % 3 === 0 ? 'resting' : 'frustrated';
+    if (member.morale >= 88 && context.productActive && Math.floor(t / 13 + index) % 8 === 0) return 'celebrating';
+
+    if (member.role === 'marketing') return context.productActive ? (Math.floor(t / 9) % 2 ? 'presenting' : 'talking') : 'talking';
+    if (member.role === 'operations') return Math.floor(t / 10 + index) % 3 === 0 ? 'walking' : 'carrying';
+    if (member.role === 'validation') return context.projectActive || context.researchActive ? 'inspecting' : 'talking';
+    if (member.role === 'thermal') return context.projectActive ? (Math.floor(t / 12) % 2 ? 'soldering' : 'inspecting') : 'resting';
+    if (member.role === 'circuit') return context.projectActive ? (Math.floor(t / 11) % 3 === 0 ? 'soldering' : 'typing') : 'talking';
+    if (member.role === 'software') return context.projectActive || context.researchActive ? 'typing' : 'talking';
+    if (member.role === 'architect') return context.projectActive ? (Math.floor(t / 14) % 4 === 0 ? 'presenting' : 'typing') : 'talking';
     return defaultModes[index % defaultModes.length] ?? 'typing';
   }
 
